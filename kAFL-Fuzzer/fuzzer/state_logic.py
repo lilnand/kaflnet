@@ -92,22 +92,7 @@ class FuzzingStateLogic:
             return None, None
         elif metadata["state"]["name"] == "initial":
             new_payload = self.handle_initial(payload, metadata)
-            return self.create_update({"name": "redq/grim"}, None), new_payload
-        elif metadata["state"]["name"] == "redq/grim":
-            grimoire_info = self.handle_grimoire_inference(payload, metadata)
-            self.handle_redqueen(payload, metadata)
-            return self.create_update({"name": "deterministic"}, {"grimoire": grimoire_info}), None
-        elif metadata["state"]["name"] == "deterministic":
-            resume, afl_det_info = self.handle_deterministic(payload, metadata)
-            if resume:
-                return self.create_update({"name": "deterministic"}, {"afl_det_info": afl_det_info}), None
-            return self.create_update({"name": "havoc"}, {"afl_det_info": afl_det_info}), None
-        elif metadata["state"]["name"] == "havoc":
-            self.handle_havoc(payload, metadata)
-            return self.create_update({"name": "final"}, None), None
-        elif metadata["state"]["name"] == "final":
-            self.handle_havoc(payload, metadata)
-            return self.create_update({"name": "final"}, None), None
+            return self.create_update({"name": "initial"}, None), new_payload
         else:
             raise ValueError("Unknown task stage %s" % metadata["state"]["name"])
 
