@@ -86,7 +86,7 @@ class qemu:
         self.cmd += " -serial file:" + self.qemu_serial_log + \
                     " -enable-kvm" \
                     " -m " + str(config.argument_values['mem']) + \
-                    " -nographic -net none" \
+                    " -nographic -net nic" \
                     " -chardev socket,server,nowait,path=" + self.control_filename + \
                     ",id=kafl_interface" \
                     " -device kafl,chardev=kafl_interface,bitmap_size=" + str(self.bitmap_size) + ",shm0=" + self.binary_filename + \
@@ -139,10 +139,11 @@ class qemu:
             self.cmd += " -kernel " + self.config.argument_values['kernel']
             if self.config.argument_values['initrd']:
                 self.cmd += " -initrd " + self.config.argument_values['initrd'] + " -append BOOTPARAM "
-        elif self.config.argument_values['bios']:
-            self.cmd += " -bios " + self.config.argument_values['bios']
         else:
             assert(False), "Must supply either -bios or -kernel or -vm_dir option"
+
+        if self.config.argument_values['bios']:
+            self.cmd += " -bios " + self.config.argument_values['bios']
 
         if self.config.argument_values["macOS"]:
             self.cmd = self.cmd.replace("-nographic -net none",
@@ -150,7 +151,7 @@ class qemu:
             if self.qemu_id == 0:
                 self.cmd = self.cmd.replace("-machine pc-q35-2.4", "-machine pc-q35-2.4 -redir tcp:5901:0.0.0.0:5900 -redir tcp:10022:0.0.0.0:22")
         else:
-            self.cmd += " -machine q35 "
+            self.cmd += " -machine q35 -usbdevice tablet "
 
 
         self.crashed = False

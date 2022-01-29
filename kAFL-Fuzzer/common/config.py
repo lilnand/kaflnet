@@ -159,7 +159,7 @@ def add_args_qemu(parser):
     parser.add_argument('-initrd', metavar='<file>', required=False, action=FullPath, type=parse_is_file,
                         help='path to the initrd/initramfs file.')
 
-    xorarg.add_argument('-bios', metavar='<file>', required=False, action=FullPath, type=parse_is_file,
+    parser.add_argument('-bios', metavar='<file>', required=False, action=FullPath, type=parse_is_file,
                         help='path to the BIOS image.')
 
     parser.add_argument('-agent', metavar='<file>', required=False, action=FullPath,
