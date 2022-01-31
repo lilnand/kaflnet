@@ -8,6 +8,7 @@ Abstractions for kAFL Master/Slave communicaton.
 """
 
 import msgpack
+import pickle
 import select
 from multiprocessing.connection import Listener, Client
 from common.util import print_fail
@@ -37,7 +38,7 @@ class ServerConnection:
             else:
                 try:
                     msg = sock_ready.recv_bytes()
-                    msg = msgpack.unpackb(msg, raw=False, strict_map_key=False)
+                    msg = pickle.loads(msg)
                     results.append((sock_ready, msg))
                 except (EOFError, IOError):
                     print_fail("Slave has died - check logs!")
@@ -48,13 +49,14 @@ class ServerConnection:
         return results
 
     def send_import(self, client, task_data):
-        client.send_bytes(msgpack.packb({"type": MSG_IMPORT, "task": task_data}, use_bin_type=True))
-
+        # client.send_bytes(msgpack.packb({"type": MSG_IMPORT, "task": task_data}, use_bin_type=True))
+        client.send_bytes(pickle.dumps({"type": MSG_IMPORT, "task": task_data}))
+    
     def send_node(self, client, task_data):
-        client.send_bytes(msgpack.packb({"type": MSG_RUN_NODE, "task": task_data}, use_bin_type=True))
+        client.send_bytes(pickle.dumps({"type": MSG_RUN_NODE, "task": task_data}))
 
     def send_busy(self, client):
-        client.send_bytes(msgpack.packb({"type": MSG_BUSY}, use_bin_type=True))
+        client.send_bytes(pickle.dumps({"type": MSG_BUSY}))
 
 
 class ClientConnection:
@@ -70,15 +72,16 @@ class ClientConnection:
 
     def recv(self):
         data = self.sock.recv_bytes()
-        return msgpack.unpackb(data, raw=False, strict_map_key=False)
+        return pickle.loads(data)
+        #return msgpack.unpackb(data, raw=False, strict_map_key=False)
 
     def send_ready(self):
-        self.sock.send_bytes(msgpack.packb({"type": MSG_READY, "client_id": self.id}, use_bin_type=True))
+        self.sock.send_bytes(pickle.dumps({"type": MSG_READY, "client_id": self.id}))
 
     def send_new_input(self, data, bitmap, info):
         self.sock.send_bytes(
-            msgpack.packb({"type": MSG_NEW_INPUT, "input": {"payload": data, "bitmap": bitmap, "info": info}}, use_bin_type=True))
+            pickle.dumps({"type": MSG_NEW_INPUT, "input": {"payload": data, "bitmap": bitmap, "info": info}}))
 
     def send_node_done(self, node_id, results, new_payload):
-        self.sock.send_bytes(msgpack.packb(
-            {"type": MSG_NODE_DONE, "node_id": node_id, "results": results, "new_payload": new_payload}, use_bin_type=True))
+        self.sock.send_bytes(pickle.dumps(
+            {"type": MSG_NODE_DONE, "node_id": node_id, "results": results, "new_payload": new_payload}))

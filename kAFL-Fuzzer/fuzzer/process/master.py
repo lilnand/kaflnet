@@ -23,7 +23,7 @@ from fuzzer.statistics import MasterStatistics
 from fuzzer.technique.redqueen.cmp import redqueen_global_config
 from fuzzer.bitmap import BitmapStorage
 from fuzzer.node import QueueNode
-
+from net.stream import Stream
 
 class MasterProcess:
 
@@ -57,9 +57,11 @@ class MasterProcess:
         if imports:
             path = imports.pop()
             print("Importing payload from %s" % path)
-            seed = read_binary_file(path)
+            stream = Stream()
+            stream.init_stream_from_pcap_file(path)
+            #seed = read_binary_file(path)
             os.remove(path)
-            return self.comm.send_import(conn, {"type": "import", "payload": seed})
+            return self.comm.send_import(conn, {"type": "import", "payload": stream})
         # Process items from queue..
         node = self.queue.get_next()
         if node:
@@ -80,14 +82,14 @@ class MasterProcess:
         while True:
             for conn, msg in self.comm.wait(self.statistics.plot_thres):
                 if msg["type"] == MSG_NODE_DONE:
-                    # Slave execution done, update queue item + send new task
+                    # Slave execution done, update queue item + send new task``
                     log_master("Received results, sending next task..")
                     if msg["node_id"]:
                         self.queue.update_node_results(msg["node_id"], msg["results"], msg["new_payload"])
                     self.send_next_task(conn)
                 elif msg["type"] == MSG_NEW_INPUT:
                     # Slave reports new interesting input
-                    if self.debug_mode:
+                    if False and self.debug_mode:
                         log_master("Received new input (exit=%s): %s" % (
                             msg["input"]["info"]["exit_reason"],
                             repr(msg["input"]["payload"][:24])))
@@ -118,7 +120,7 @@ class MasterProcess:
             if n_limit < self.statistics.data['total_execs']:
                 raise SystemExit("Exit on max execs.")
 
-    def maybe_insert_node(self, payload, bitmap_array, node_struct):
+    def maybe_insert_node(self, stream, bitmap_array, node_struct):
         bitmap = ExecutionResult.bitmap_from_bytearray(bitmap_array, node_struct["info"]["exit_reason"],
                                                        node_struct["info"]["performance"])
         bitmap.lut_applied = True  # since we received the bitmap from the slave, the lut was already applied
@@ -126,7 +128,7 @@ class MasterProcess:
         should_store, new_bytes, new_bits = self.bitmap_storage.should_store_in_queue(bitmap)
         new_data = bitmap.copy_to_array()
         if should_store:
-            node = QueueNode(payload, bitmap_array, node_struct, write=False)
+            node = QueueNode(stream, bitmap_array, node_struct, write=False)
             node.set_new_bytes(new_bytes, write=False)
             node.set_new_bits(new_bits, write=False)
             self.queue.insert_input(node, bitmap)
