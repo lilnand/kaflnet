@@ -29,7 +29,7 @@ from fuzzer.node import QueueNode
 from fuzzer.state_logic import FuzzingStateLogic
 from fuzzer.statistics import SlaveStatistics
 from fuzzer.technique.helper import rand
-
+from net.stream import Stream
 
 def slave_loader(slave_id):
 
@@ -104,8 +104,10 @@ class SlaveProcess:
     def handle_node(self, msg):
         meta_data = QueueNode.get_metadata(msg["task"]["nid"])
         payload = QueueNode.get_payload(meta_data["info"]["exit_reason"], meta_data["id"])
+        stream = Stream()
+        stream.init_stream_from_node_payload(payload)
 
-        results, new_payload = self.logic.process_node(payload, meta_data)
+        results, new_payload = self.logic.process_node(stream, meta_data)
         if new_payload:
             default_info = {"method": "validate_bits", "parent": meta_data["id"]}
             if self.validate_bits(new_payload, meta_data, default_info):
@@ -139,12 +141,12 @@ class SlaveProcess:
             else:
                 raise ValueError("Unknown message type {}".format(msg))
 
-    def quick_validate(self, data, old_res, quiet=False):
+    def quick_validate(self, stream, old_res, quiet=False):
         # Validate in persistent mode. Faster but problematic for very funky targets
         self.statistics.event_exec()
         old_array = old_res.copy_to_array()
 
-        new_res = self.__execute(data).apply_lut()
+        new_res = self.__execute(stream).apply_lut()
         new_array = new_res.copy_to_array()
 
         if new_array == old_array:
@@ -154,13 +156,13 @@ class SlaveProcess:
             log_slave("Input validation failed! Target is funky?..", self.slave_id)
         return False
 
-    def funky_validate(self, data, old_res):
+    def funky_validate(self, stream, old_res):
         # Validate in persistent mode with stochastic prop of funky results
 
         validations = 8
         confirmations = 0
         for _ in range(validations):
-            if self.quick_validate(data, old_res, quiet=True):
+            if self.quick_validate(stream, old_res, quiet=True):
                 confirmations += 1
 
         if confirmations >= 0.8*validations:
@@ -168,16 +170,16 @@ class SlaveProcess:
 
         log_slave("Funky input received %d/%d confirmations. Rejecting.." % (confirmations, validations), self.slave_id)
         if self.config.argument_values['v']:
-            self.store_funky(data)
+            self.store_funky(stream)
         return False
 
-    def store_funky(self, data):
+    def store_funky(self, stream):
         global num_funky
         num_funky += 1
 
         # store funky input for further analysis 
         funky_folder = self.config.argument_values['work_dir'] + "/funky/"
-        atomic_write(funky_folder + "input_%02d_%05d" % (self.slave_id, num_funky), data)
+        atomic_write(funky_folder + "input_%02d_%05d" % (self.slave_id, num_funky), bytes(stream))
 
     def validate_bits(self, data, old_node, default_info):
         new_bitmap, _ = self.execute(data, default_info)
@@ -231,29 +233,29 @@ class SlaveProcess:
 
         return exec_res
 
-    def __execute(self, data, retry=0):
+    def __execute(self, stream, retry=0):
 
         try:
-            self.q.set_payload(data)
+            self.q.set_payload(stream)
             return self.q.send_payload()
         except (ValueError, BrokenPipeError):
             if retry > 2:
                 # TODO if it reliably kills qemu, perhaps log to master for harvesting..
                 print_fail("Slave %d aborting due to repeated SHM/socket error. Check logs." % self.slave_id)
-                log_slave("Aborting due to repeated SHM/socket error. Payload: %s" % repr(data), self.slave_id)
+                log_slave("Aborting due to repeated SHM/socket error. Payload: %s" % repr(stream), self.slave_id)
                 raise
             print_warning("SHM/socket error on Slave %d (retry %d)" % (self.slave_id, retry))
             log_slave("SHM/socket error, trying to restart qemu...", self.slave_id)
             self.statistics.event_reload()
             if not self.q.restart():
                 raise
-        return self.__execute(data, retry=retry+1)
+        return self.__execute(stream, retry=retry+1)
 
 
-    def execute(self, data, info):
+    def execute(self, stream, info):
         self.statistics.event_exec()
 
-        exec_res = self.__execute(data)
+        exec_res = self.__execute(stream)
 
         is_new_input = self.bitmap_storage.should_send_to_master(exec_res)
         crash = exec_res.is_crash()
@@ -265,15 +267,15 @@ class SlaveProcess:
             if not crash:
                 assert exec_res.is_lut_applied()
                 if self.config.argument_values["funky"]:
-                    stable = self.funky_validate(data, exec_res)
+                    stable = self.funky_validate(stream, exec_res)
                 else:
-                    stable = self.quick_validate(data, exec_res)
+                    stable = self.quick_validate(stream, exec_res)
 
                 if not stable:
                     # TODO: auto-throttle persistent runs based on funky rate?
                     self.statistics.event_funky()
             if crash or stable:
-                self.__send_to_master(data, exec_res, info)
+                self.__send_to_master(stream, exec_res, info)
         else:
             if crash:
                 log_slave("Crashing input found (%s), but not new (discarding)" % (exec_res.exit_reason), self.slave_id)

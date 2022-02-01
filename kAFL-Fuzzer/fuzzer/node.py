@@ -13,7 +13,7 @@ import msgpack
 
 from common.config import FuzzerConfiguration
 from common.util import read_binary_file, atomic_write
-
+from net.stream import Stream
 
 class QueueNode:
     NextID = 1
@@ -38,6 +38,10 @@ class QueueNode:
     def get_payload(exitreason, id):
         return read_binary_file(QueueNode.__get_payload_filename(exitreason, id))
 
+    @staticmethod
+    def get_stream_payload(exitreason, id):
+        stream = Stream()
+        return 
     def __get_bitmap_filename(self):
         workdir = FuzzerConfiguration().argument_values['work_dir']
         filename = "/bitmaps/payload_%05d.lz4" % (self.get_id())
@@ -93,9 +97,9 @@ class QueueNode:
         self.node_struct = QueueNode.apply_metadata_update(self.node_struct, delta)
         self.update_file(write=True)
 
-    def set_payload(self, payload, write=True):
-        self.set_payload_len(len(payload), write=False)
-        atomic_write(QueueNode.__get_payload_filename(self.get_exit_reason(), self.get_id()), payload)
+    def set_payload(self, stream, write=True):
+        self.set_payload_len(len(stream), write=False)
+        atomic_write(QueueNode.__get_payload_filename(self.get_exit_reason(), self.get_id()), bytes(stream))
 
     def get_payload_len(self):
         return self.node_struct["payload_len"]

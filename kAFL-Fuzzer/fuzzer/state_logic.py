@@ -145,13 +145,13 @@ class FuzzingStateLogic:
             info.update(extra_info)
         return info
 
-    def handle_import(self, payload, metadata):
+    def handle_import(self, stream, metadata):
         # TODO: We seem to have some corner case where PT feedback does not
         # work and the seed has to be provided multiple times to actually
         # (eventually) be recognized correctly..
         retries = 4
         for _ in range(retries):
-            _, is_new = self.execute(payload, label="import")
+            _, is_new = self.execute(stream, label="import")
             if is_new: break
 
         # Inform user if seed yields no new coverage. This may happen if -ip0 is
@@ -161,19 +161,19 @@ class FuzzingStateLogic:
             log_slave("`Imported payload produced no new coverage, skipping..", self.slave.slave_id)
 
 
-    def handle_initial(self, payload, metadata):
+    def handle_initial(self, stream, metadata):
         time_initial_start = time.time()
 
         if self.config.argument_values["trace"]:
             self.stage_update_label("trace")
-            self.slave.trace_payload(payload, metadata)
+            self.slave.trace_payload(stream, metadata)
 
         self.stage_update_label("calibrate")
         # Update input performance using multiple randomized executions
         # Scheduler will de-prioritize execution of very slow nodes..
         num_execs = 10
         timer_start = time.time()
-        havoc.mutate_seq_havoc_array(payload, self.execute, num_execs)
+        havoc.mutate_seq_havoc_array(stream, self.execute, num_execs)
         timer_end = time.time()
         self.performance = (timer_end-timer_start) / num_execs
 
@@ -182,18 +182,9 @@ class FuzzingStateLogic:
             log_slave("Validate: Skip trimming..", self.slave.slave_id)
             return None
 
-        center_trim = False
-
-        new_payload = perform_trim(payload, metadata, self.execute)
-
-        if center_trim:
-            new_payload = perform_center_trim(new_payload, metadata, self.execute, trimming_bytes=2)
         self.initial_time += time.time() - time_initial_start
-        if new_payload == payload:
-            return None
-        #log_slave("before trim:\t\t{}".format(repr(payload)), self.slave.slave_id)
-        #log_slave("after trim:\t\t{}".format(repr(new_payload)), self.slave.slave_id)
-        return new_payload
+
+        return None
 
     def handle_grimoire_inference(self, payload, metadata):
         grimoire_info = {}
@@ -291,21 +282,21 @@ class FuzzingStateLogic:
                   self.slave.slave_id)
 
 
-    def validate_bytes(self, payload, metadata, extra_info=None):
+    def validate_bytes(self, stream, metadata, extra_info=None):
         self.stage_info_execs += 1
         # FIXME: can we lift this function from slave to this class and avoid this wrapper?
         parent_info = self.get_parent_info(extra_info)
-        return self.slave.validate_bytes(payload, metadata, parent_info)
+        return self.slave.validate_bytes(stream, metadata, parent_info)
 
 
-    def execute(self, payload, label=None, extra_info=None):
+    def execute(self, stream, label=None, extra_info=None):
 
         self.stage_info_execs += 1
         if label and label != self.stage_info["method"]:
             self.stage_update_label(label)
 
         parent_info = self.get_parent_info(extra_info)
-        bitmap, is_new = self.slave.execute(payload, parent_info)
+        bitmap, is_new = self.slave.execute(stream, parent_info)
         if is_new:
             self.stage_info_findings += 1
         return bitmap, is_new
