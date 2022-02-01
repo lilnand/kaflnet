@@ -1,3 +1,4 @@
+from logging import exception
 import random
 import struct
 from scapy.utils import rdpcap
@@ -24,23 +25,19 @@ class Stream:
             self.packets.append(payload[pos:][:caplen])
             pos += caplen
             
-    def __getitem__(self, key):
-        return self.packet[key]
+    def __getitem__(self, index):
+        if index >= len(self.packets):
+            raise exception('__getitem__ overflow')
+        return self.packet[index]
 
     def __setitem__(self, key, value):
         self.packets[key] = value
 
-    def __delitem__(self, key):
-        pass
-
-    def __getslice__(self, start, end):
-        pass
-
     def __bytes__(self):
-        return self.build_pcap_without_header()
+        return self.build()
 
     def __len__(self):
-        return len(self.build_pcap_without_header())
+        return len(self.build())
 
     def raw_size(self):
         raw_size = 0
@@ -52,7 +49,7 @@ class Stream:
         index = random.choice(range(len(self.packets)))
         self.packets[index] = handler(self.packets[index])
 
-    def build_pcap_without_header(self):
+    def build(self):
         payload = b''
         
         for p in self.packets:
