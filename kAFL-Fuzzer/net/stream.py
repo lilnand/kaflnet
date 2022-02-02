@@ -4,6 +4,7 @@ import struct
 from logging import exception
 from scapy.utils import rdpcap
 
+from net.bindings import Binder
 from net.layers.l2 import FuzzEther
 
 class Stream:
@@ -26,7 +27,7 @@ class Stream:
 
     def init_stream_from_pcap_file(self, pcap_file):
         pcap = rdpcap(pcap_file)
- 
+
         for p in pcap:
             _pkt = FuzzEther(bytes(p))
             self.packets.append(_pkt)
