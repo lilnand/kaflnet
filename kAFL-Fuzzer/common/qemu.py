@@ -744,7 +744,7 @@ class qemu:
         return True
 
     def set_payload(self, stream):
-        payload = stream.build_pcap_without_header()
+        payload = stream.build()
         if self.exiting:
             sys.exit(0)
 
