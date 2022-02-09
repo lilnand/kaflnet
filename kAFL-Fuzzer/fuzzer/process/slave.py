@@ -10,6 +10,7 @@ Request fuzz input from Master and process it through various fuzzing stages/mut
 Each Slave is associated with a single Qemu instance for executing fuzz inputs.
 """
 
+from logging import exception
 import os
 import psutil
 import time
@@ -104,9 +105,12 @@ class SlaveProcess:
     def handle_node(self, msg):
         meta_data = QueueNode.get_metadata(msg["task"]["nid"])
         payload = QueueNode.get_payload(meta_data["info"]["exit_reason"], meta_data["id"])
-        stream = Stream()
-        stream.init_stream_from_node_payload(payload)
 
+        try:
+            stream = Stream(self.config, node_payload=payload)
+        except exception as e:
+            print(e)
+            
         results, new_payload = self.logic.process_node(stream, meta_data)
         if new_payload:
             default_info = {"method": "validate_bits", "parent": meta_data["id"]}

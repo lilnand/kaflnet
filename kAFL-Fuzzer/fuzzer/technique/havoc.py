@@ -47,21 +47,21 @@ def havoc_range(perf_score):
     return max_iterations
 
 
-def mutate_seq_havoc_array(stream, func, max_iterations, resize=False):
-    # TODO: think about that
-    #  if resize:
-    #     data = data + data
-    # else:
-    #     data = data
+def mutate_seq_havoc_array(data, func, max_iterations, resize=False):
+    if resize:
+        data = data + data
+    else:
+        data = data
 
     for i in range(max_iterations):
         stacking = rand.int(AFL_HAVOC_STACK_POW2)
 
         for j in range(1 << (1 + stacking)):
             handler = rand.select(havoc_handler)
-            stream.mutate_stream(handler)
-            
-        func(stream)
+            data = handler(data)
+            if len(data) >= KAFL_MAX_FILE:
+                data = data[:KAFL_MAX_FILE]
+        func(data)
 
 
 def mutate_seq_splice_array(data, func, max_iterations, resize=False):

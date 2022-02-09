@@ -25,7 +25,7 @@ from fuzzer.technique.redqueen.mod import RedqueenInfoGatherer
 from fuzzer.technique.redqueen.workdir import RedqueenWorkdir
 from fuzzer.technique.trim import perform_trim, perform_center_trim
 from fuzzer.technique.helper import rand
-
+from net.stream import StreamStateLogic
 
 class FuzzingStateLogic:
     HAVOC_MULTIPLIER = 2
@@ -37,6 +37,7 @@ class FuzzingStateLogic:
     def __init__(self, slave, config):
         self.slave = slave
         self.config = config
+        self.stream_logic = StreamStateLogic()
         self.grimoire = GrimoireInference(config, self.validate_bytes)
         havoc.init_havoc(config)
         radamsa.init_radamsa(config, self.slave.slave_id)
@@ -90,9 +91,30 @@ class FuzzingStateLogic:
         if metadata["state"]["name"] == "import":
             self.handle_import(payload, metadata)
             return None, None
-        elif metadata["state"]["name"] == "initial":
+
+        results, new_payload = self.stream_logic.process_node(payload, metadata)
+        
+        if results:
+            return results, new_payload
+
+        if metadata["state"]["name"] == "initial":
             new_payload = self.handle_initial(payload, metadata)
-            return self.create_update({"name": "initial"}, None), new_payload
+            return self.create_update({"name": "redq/grim"}, None), new_payload
+        elif metadata["state"]["name"] == "redq/grim":
+            grimoire_info = self.handle_grimoire_inference(payload, metadata)
+            self.handle_redqueen(payload, metadata)
+            return self.create_update({"name": "deterministic"}, {"grimoire": grimoire_info}), None
+        elif metadata["state"]["name"] == "deterministic":
+            resume, afl_det_info = self.handle_deterministic(payload, metadata)
+            if resume:
+                return self.create_update({"name": "deterministic"}, {"afl_det_info": afl_det_info}), None
+            return self.create_update({"name": "havoc"}, {"afl_det_info": afl_det_info}), None
+        elif metadata["state"]["name"] == "havoc":
+            self.handle_havoc(payload, metadata)
+            return self.create_update({"name": "final"}, None), None
+        elif metadata["state"]["name"] == "final":
+            self.handle_havoc(payload, metadata)
+            return self.create_update({"name": "final"}, None), None
         else:
             raise ValueError("Unknown task stage %s" % metadata["state"]["name"])
 
@@ -161,19 +183,19 @@ class FuzzingStateLogic:
             log_slave("`Imported payload produced no new coverage, skipping..", self.slave.slave_id)
 
 
-    def handle_initial(self, stream, metadata):
+    def handle_initial(self, payload, metadata):
         time_initial_start = time.time()
 
         if self.config.argument_values["trace"]:
             self.stage_update_label("trace")
-            self.slave.trace_payload(stream, metadata)
+            self.slave.trace_payload(payload, metadata)
 
         self.stage_update_label("calibrate")
         # Update input performance using multiple randomized executions
         # Scheduler will de-prioritize execution of very slow nodes..
         num_execs = 10
         timer_start = time.time()
-        havoc.mutate_seq_havoc_array(stream, self.execute, num_execs)
+        havoc.mutate_seq_havoc_array(payload, self.execute, num_execs)
         timer_end = time.time()
         self.performance = (timer_end-timer_start) / num_execs
 
@@ -182,9 +204,18 @@ class FuzzingStateLogic:
             log_slave("Validate: Skip trimming..", self.slave.slave_id)
             return None
 
-        self.initial_time += time.time() - time_initial_start
+        center_trim = False
 
-        return None
+        new_payload = perform_trim(payload, metadata, self.execute)
+
+        if center_trim:
+            new_payload = perform_center_trim(new_payload, metadata, self.execute, trimming_bytes=2)
+        self.initial_time += time.time() - time_initial_start
+        if new_payload == payload:
+            return None
+        #log_slave("before trim:\t\t{}".format(repr(payload)), self.slave.slave_id)
+        #log_slave("after trim:\t\t{}".format(repr(new_payload)), self.slave.slave_id)
+        return new_payload
 
     def handle_grimoire_inference(self, payload, metadata):
         grimoire_info = {}

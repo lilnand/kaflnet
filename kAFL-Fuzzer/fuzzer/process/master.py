@@ -10,6 +10,7 @@ Manage overall fuzz inputs/findings and schedule work for Slave instances.
 """
 
 import glob
+from logging import exception
 import os
 from   pprint import pformat
 import mmh3
@@ -57,8 +58,11 @@ class MasterProcess:
         if imports:
             path = imports.pop()
             print("Importing payload from %s" % path)
-            stream = Stream()
-            stream.init_stream_from_pcap_file(path)
+
+            try:
+                stream = Stream(self.config, pcap_file=path)
+            except exception as e:
+                print(e)
             #seed = read_binary_file(path)
             os.remove(path)
             return self.comm.send_import(conn, {"type": "import", "payload": stream})
@@ -93,7 +97,7 @@ class MasterProcess:
                         log_master("Received new input (exit=%s): %s" % (
                             msg["input"]["info"]["exit_reason"],
                             repr(msg["input"]["payload"][:24])))
-                    node_struct = {"info": msg["input"]["info"], "state": {"name": "initial"}}
+                    node_struct = {"info": msg["input"]["info"], "state": {"name": "stream/initial"}}
                     self.maybe_insert_node(msg["input"]["payload"], msg["input"]["bitmap"], node_struct)
                 elif msg["type"] == MSG_READY:
                     # Initial slave hello, send first task...
