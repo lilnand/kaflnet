@@ -37,7 +37,7 @@ class FuzzingStateLogic:
     def __init__(self, slave, config):
         self.slave = slave
         self.config = config
-        self.stream_logic = StreamStateLogic()
+        self.stream_logic = StreamStateLogic(slave, self, config)
         self.grimoire = GrimoireInference(config, self.validate_bytes)
         havoc.init_havoc(config)
         radamsa.init_radamsa(config, self.slave.slave_id)
