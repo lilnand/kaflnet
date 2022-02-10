@@ -38,10 +38,6 @@ class QueueNode:
     def get_payload(exitreason, id):
         return read_binary_file(QueueNode.__get_payload_filename(exitreason, id))
 
-    @staticmethod
-    def get_stream_payload(exitreason, id):
-        stream = Stream()
-        return 
     def __get_bitmap_filename(self):
         workdir = FuzzerConfiguration().argument_values['work_dir']
         filename = "/bitmaps/payload_%05d.lz4" % (self.get_id())
@@ -84,7 +80,8 @@ class QueueNode:
         old_data["attention_secs"] = old_data.get("attention_secs", 0) + new_data["attention_secs"]
 
         for key in ["state_time_initial", "state_time_havoc", "state_time_grimoire", "state_time_grimoire_inference",
-                    "state_time_redqueen"]:
+                    "state_time_redqueen", "stream_initial_time", "stream_push_layer_time", "stream_pop_layer_time",
+                    "stream_shuffle_time"]:
             old_data[key] = old_data.get(key, 0) + new_data[key]
             del new_data[key]
 

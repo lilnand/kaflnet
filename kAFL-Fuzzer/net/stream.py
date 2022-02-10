@@ -1,10 +1,12 @@
 import random
 import struct
+import time
 
+from copy import deepcopy
 from logging import exception
 from scapy.layers.l2 import Ether
 from scapy.layers.inet6 import IPv6, _ICMPv6
-from scapy.packet import Packet
+from scapy.packet import Packet, fuzz
 from scapy.utils import rdpcap
 
 class StreamStateLogic:
@@ -14,25 +16,45 @@ class StreamStateLogic:
         self.config = config
     
     def handle_stream_initial(self, stream, metadata):
-        pass
-    
+        time_stream_initial_start = time.time()
+        iterations = 2 ** random.randint(0, 6)
+        new_stream = deepcopy(stream)
+
+        for _ in iterations:
+            packet = random.choice(new_stream.packets)
+            layer_name = random.choice(packet.layers()).__name__
+            layer = packet[layer_name]
+            fzlayer = fuzz(layer)
+
+            for dfname in fzlayer.default_fields:
+                layer[dfname] = fzlayer.default_fields[dfname]
+
+            res, is_new = self.logic.execute(new_stream, label="stream/initial")
+
+            if is_new:
+                self.stream_initial_time += time.time() - time_stream_initial_start
+                return new_stream
+
+        self.stream_initial_time += time.time() - time_stream_initial_start
+        return None
+
     def handle_stream_push(self, stream, metadata):
-        pass
+        return None
 
     def handle_stream_pop(self, stream, metadata):
-        pass
+        return None
 
     def handle_stream_shuffle(self, stream, metadata):
-        pass
+        return None
 
     def process_node(self, stream, metadata):
         self.init_stage_info()
 
-        rand_states = ["stream/push", "stream/pop"]
+        rand_states = ["stream/push", "stream/pop", "stream/shuffle"]
 
         if metadata["state"]["name"] == "stream/initial":
-            new_paylaod = self.handle_stream_initial(stream, metadata)
-            return self.logic.create_update({"name": random.choice(rand_states)}, None), new_paylaod
+            new_stream = self.handle_stream_initial(stream, metadata)
+            return self.logic.create_update({"name": random.choice(rand_states)}, None), new_stream
         elif metadata["state"]["name"] == "stream/push":
             new_paylaod = self.handle_stream_push(stream, metadata)
             return self.logic.create_update({"name": "stream/shuffle"}, None), new_paylaod
