@@ -42,7 +42,7 @@ class StreamStateLogic:
             fzlayer = fuzz(layer)
 
             for dfname in fzlayer.default_fields:
-                layer[dfname] = fzlayer.default_fields[dfname]
+                layer.fields[dfname] = fzlayer.default_fields[dfname]
 
             res, is_new = self.logic.execute(new_stream, label="stream/initial")
 
