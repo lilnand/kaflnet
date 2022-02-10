@@ -113,12 +113,12 @@ class Stream:
             self._init_from_node_payload(node_payload)
 
     def _modify_ethernet(self, packet):
-        packet['Ether']['dst'] = self.ethernet['dst']
-        packet['Ether']['src'] = self.ethernet['src']
-        packet['Ether']['type'] = self.ethernet['type']
+        packet['Ether'].fields['dst'] = self.ethernet.dst
+        packet['Ether'].fields['src'] = self.ethernet.src
+        packet['Ether'].fields['type'] = self.ethernet.type
 
     def _modify_ipv6(self, packet):
-        packet['IPv6']['dst'] = self.ip['dst']
+        packet['IPv6'].fields['dst'] = self.ip.dst
 
     def _modify_packet(self, packet):
         self._modify_ethernet(packet)
