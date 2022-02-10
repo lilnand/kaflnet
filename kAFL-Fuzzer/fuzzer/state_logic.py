@@ -89,35 +89,32 @@ class FuzzingStateLogic:
 
         return ret
 
-    def process_node(self, payload, metadata):
+    def process_node(self, stream, metadata):
         self.init_stage_info(metadata)
 
         if metadata["state"]["name"] == "import":
-            self.handle_import(payload, metadata)
+            self.handle_import(stream, metadata)
             return None, None
 
-        results, new_payload = self.stream_logic.process_node(payload, metadata)
+        results, new_stream = self.stream_logic.process_node(stream, metadata)
         
         if results:
-            return results, new_payload
+            return results, new_stream
 
         if metadata["state"]["name"] == "initial":
-            new_payload = self.handle_initial(payload, metadata)
+            new_payload = self.stream_logic.handle_kafl_stage(stream, metadata, self.handle_initial)
             return self.create_update({"name": "redq/grim"}, None), new_payload
         elif metadata["state"]["name"] == "redq/grim":
-            grimoire_info = self.handle_grimoire_inference(payload, metadata)
-            self.handle_redqueen(payload, metadata)
+            grimoire_info = self.stream_logic.handle_kafl_stage(stream, metadata, self.handle_grimoire_inference)
+            self.stream_logic.handle_kafl_stage(stream, metadata, self.handle_redqueen)
             return self.create_update({"name": "deterministic"}, {"grimoire": grimoire_info}), None
         elif metadata["state"]["name"] == "deterministic":
-            resume, afl_det_info = self.handle_deterministic(payload, metadata)
+            resume, afl_det_info = self.stream_logic.handle_kafl_stage(stream, metadata, self.handle_deterministic)
             if resume:
                 return self.create_update({"name": "deterministic"}, {"afl_det_info": afl_det_info}), None
             return self.create_update({"name": "havoc"}, {"afl_det_info": afl_det_info}), None
-        elif metadata["state"]["name"] == "havoc":
-            self.handle_havoc(payload, metadata)
-            return self.create_update({"name": "final"}, None), None
-        elif metadata["state"]["name"] == "final":
-            self.handle_havoc(payload, metadata)
+        elif metadata["state"]["name"] in ["havoc", "final"]:
+            self.stream_logic.handle_kafl_stage(stream, metadata, self.handle_havoc)
             return self.create_update({"name": "final"}, None), None
         else:
             raise ValueError("Unknown task stage %s" % metadata["state"]["name"])

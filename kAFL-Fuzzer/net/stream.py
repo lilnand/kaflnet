@@ -15,10 +15,25 @@ class StreamStateLogic:
         self.logic = logic
         self.config = config
     
+    def handle_kafl_stage(self, stream, metadata, func):
+        new_stream = deepcopy(stream)
+        index = random.randint(0, stream.size() - 1)
+        packet = new_stream[index]
+
+        if metadata["state"]["name"] == "initial":
+            new_payload = func(bytes(packet), metadata)
+            new_stream[index] = new_payload
+            return new_payload
+
+        return func(bytes(packet), metadata)           
+        
+
     def handle_stream_initial(self, stream, metadata):
         time_stream_initial_start = time.time()
         iterations = 2 ** random.randint(0, 6)
         new_stream = deepcopy(stream)
+
+        self.logic.stage_update_label("strm/init")
 
         for _ in iterations:
             packet = random.choice(new_stream.packets)
@@ -151,9 +166,8 @@ class Stream:
 
         return False
 
-    def mutate_stream(self, handler):
-        index = random.choice(range(len(self.packets)))
-        self.packets[index] = handler(bytes(self.packets[index]))
+    def size(self):
+        return len(self.packets)
 
     def build(self):
         payload = b''
@@ -173,8 +187,10 @@ class Stream:
             raise exception('__getitem__ overflow')
         return self.packet[index]
 
-    def __setitem__(self, key, value):
-        self.packets[key] = value
+    def __setitem__(self, index, value):
+        if index >= len(self.packets):
+            raise exception('__getitem__ overflow')
+        self.packets[index] = value
 
     def __bytes__(self):
         return self.build()
