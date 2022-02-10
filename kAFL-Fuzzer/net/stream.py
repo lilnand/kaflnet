@@ -35,7 +35,7 @@ class StreamStateLogic:
 
         self.logic.stage_update_label("strm/init")
 
-        for _ in iterations:
+        for _ in range(iterations):
             packet = random.choice(new_stream.packets)
             layer_name = random.choice(packet.layers()).__name__
             layer = packet[layer_name]
