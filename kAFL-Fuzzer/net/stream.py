@@ -185,7 +185,7 @@ class Stream:
     def __getitem__(self, index):
         if index >= len(self.packets):
             raise exception('__getitem__ overflow')
-        return self.packet[index]
+        return self.packets[index]
 
     def __setitem__(self, index, value):
         if index >= len(self.packets):
