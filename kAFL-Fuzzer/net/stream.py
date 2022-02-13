@@ -83,9 +83,9 @@ class StreamStateLogic:
         new_stream = deepcopy(stream)
     
         for _ in range(8):
-            index = random.randint(0, new_stream.size())
-            random_layer = eval(random.choice(list(icmp6typescls.values())))
-            new_stream[index].add_payload(fuzz(random_layer()))
+            index = random.randint(0, new_stream.size() - 1)
+            cls = random.choice(list(icmp6typescls.values()))
+            new_stream[index].add_payload(fuzz(cls()))
 
             _, is_new = self.logic.execute(new_stream, label="stream/push")
             
@@ -104,7 +104,7 @@ class StreamStateLogic:
         new_stream = deepcopy(stream)
         
         for _ in range(8):
-            index = random.randint(0, new_stream.size())
+            index = random.randint(0, new_stream.size()-1)
             layers_len = len(new_stream[index].layers())
             remove_payload_from = random.randint(1, layers_len)
             new_stream[index][remove_payload_from].remove_payload()
@@ -125,18 +125,19 @@ class StreamStateLogic:
         new_stream = deepcopy(stream)
 
         for _ in range(8):
-            index = random.randint(0, new_stream.size())
+            index = random.randint(0, new_stream.size() - 1)
             shuffle_layers = random.shuffle(new_stream[index].layers()[2:])
-            new_stream[index][1].remove_payload()
             
-            for l in shuffle_layers:
-                new_stream[index].add_payload(fuzz(l))
-            
-            _, is_new = self.logic.execute(new_stream, label="stream/shuffle")
-            
-            if is_new:
-                self.stream_shuffle_time = time.time() - time_stream_shuffle_start
-                return new_stream
+            if shuffle_layers:
+                new_stream[index][1].remove_payload()
+                for l in shuffle_layers:
+                    new_stream[index].add_payload(fuzz(l))
+                
+                _, is_new = self.logic.execute(new_stream, label="stream/shuffle")
+                
+                if is_new:
+                    self.stream_shuffle_time = time.time() - time_stream_shuffle_start
+                    return new_stream
         
         self.stream_shuffle_time = time.time() - time_stream_shuffle_start
         return new_stream
