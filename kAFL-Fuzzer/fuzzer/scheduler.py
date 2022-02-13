@@ -84,11 +84,11 @@ class Scheduler:
         # TODO: only actually have to compute all this for new nodes and fav bit changes...
         node.set_score(score)
 
-        if node.get_state() in ["initial", "redq/grim"]:
+        if node.get_state() in ["initial", "redq/grim", "stream/initial"]:
             phase = 256
-        elif node.get_state() in ["deterministic"]:
+        elif node.get_state() in ["deterministic", "stream/push", "stream/pop"]:
             phase = 8
-        elif node.get_state() in ["havoc"]:
+        elif node.get_state() in ["havoc", "stream/shuffle"]:
             phase = 1
         elif node.get_state() in ["final"]:
             # promote later discovered nodes by compensating for total time spend in havoc.
