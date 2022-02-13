@@ -9,6 +9,7 @@ from scapy.layers.l2 import Ether
 from scapy.packet import Packet, fuzz
 from scapy.utils import rdpcap
 from scapy.layers.inet6 import *
+from scapy.layers.inet6 import _ICMPv6
 
 class bytes_linked_with_stream:
     def __init__(self, stream, index):
