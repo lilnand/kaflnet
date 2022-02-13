@@ -27,7 +27,10 @@ class bytes_linked_with_stream:
 
     def __repr__(self):
         return str(self.build())
-        
+    
+    def __len__(self):
+        return len(self.stream[self.indx])
+
     def build(self):
         return self.stream.build()
 
@@ -96,7 +99,7 @@ class StreamStateLogic:
             return self.logic.create_update({"name": "stream/shuffle"}, None), new_paylaod
         elif metadata["state"]["name"] == "stream/shuffle":
             new_paylaod = self.handle_stream_shuffle(stream, metadata)
-            return self.logic.create_update({"name": "initial"}, None), new_paylaod
+            return self.logic.create_update({"name": "final"}, None), new_paylaod
         
         return None, None
 

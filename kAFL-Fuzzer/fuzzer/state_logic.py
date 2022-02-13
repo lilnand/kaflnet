@@ -96,7 +96,7 @@ class FuzzingStateLogic:
             self.handle_import(stream, metadata)
             return None, None
 
-        results, new_stream = self.stream_logic.process_node(stream, metadata)
+        return self.stream_logic.process_node(stream, metadata)
         
         if results:
             return results, new_stream
