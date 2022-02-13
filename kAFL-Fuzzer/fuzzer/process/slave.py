@@ -237,7 +237,7 @@ class SlaveProcess:
 
         return exec_res
 
-    def __execute(self, stream, retry=0):
+    def __execute(self, stream, retry=0, is_stream=False):
 
         try:
             self.q.set_payload(stream)
@@ -256,7 +256,7 @@ class SlaveProcess:
         return self.__execute(stream, retry=retry+1)
 
 
-    def execute(self, stream, info):
+    def execute(self, stream, info, is_stream=False):
         self.statistics.event_exec()
 
         exec_res = self.__execute(stream)

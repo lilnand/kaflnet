@@ -9,6 +9,28 @@ from scapy.layers.inet6 import IPv6, _ICMPv6
 from scapy.packet import Packet, fuzz
 from scapy.utils import rdpcap
 
+class bytes_linked_with_stream:
+    def __init__(self, stream, index):
+        self.stream = stream
+        self.indx = index
+
+    def __getitem__(self, key):
+        new_stream = deepcopy(self.stream)
+        new_stream[self.indx] = self.stream[self.indx][key]
+        return bytes_linked_with_stream(new_stream, self.indx)
+
+    def __setitem__(self, key, val):
+        self.stream[self.indx][key] = val
+
+    def __add__(self, val):
+        return self.stream[self.indx] + val
+
+    def __repr__(self):
+        return str(self.build())
+        
+    def build(self):
+        return self.stream.build()
+
 class StreamStateLogic:
     def __init__(self, slave, logic, config):
         self.slave = slave
@@ -18,14 +40,10 @@ class StreamStateLogic:
     def handle_kafl_stage(self, stream, metadata, func):
         new_stream = deepcopy(stream)
         index = random.randint(0, stream.size() - 1)
-        packet = new_stream[index]
+        
+        payload = bytes_linked_with_stream(new_stream, index)
 
-        if metadata["state"]["name"] == "initial":
-            new_payload = func(bytes(packet), metadata)
-            new_stream[index] = new_payload
-            return new_payload
-
-        return func(bytes(packet), metadata)           
+        return func(payload, metadata)           
         
 
     def handle_stream_initial(self, stream, metadata):

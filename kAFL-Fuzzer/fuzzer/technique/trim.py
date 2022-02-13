@@ -61,17 +61,17 @@ def perform_center_trim(payload, old_node, send_handler, trimming_bytes):
     return payload
 
 
-def perform_trim(stream, old_node, send_handler):
+def perform_trim(payload, old_node, send_handler):
     global MAX_ROUNDS, MAX_EXECS, MIN_SIZE, APPEND_BYTES
-    if len(stream) <= MIN_SIZE:
-        return stream
+    if len(payload) <= MIN_SIZE:
+        return payload
 
-    old_res, _ = send_handler(stream, label="trim_funky")
+    old_res, _ = send_handler(payload, label="trim_funky")
     if old_res.is_crash():
-        return stream
+        return payload
 
     execs = 0
-    new_size = len(stream)
+    new_size = len(payload)
 
     for _ in range(MAX_ROUNDS):
         abort = True
