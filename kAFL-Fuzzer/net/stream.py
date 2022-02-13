@@ -1,3 +1,4 @@
+from operator import index
 import random
 import struct
 import time
@@ -5,9 +6,9 @@ import time
 from copy import deepcopy
 from logging import exception
 from scapy.layers.l2 import Ether
-from scapy.layers.inet6 import IPv6, _ICMPv6
 from scapy.packet import Packet, fuzz
 from scapy.utils import rdpcap
+from scapy.layers.inet6 import *
 
 class bytes_linked_with_stream:
     def __init__(self, stream, index):
@@ -75,13 +76,69 @@ class StreamStateLogic:
         return None
 
     def handle_stream_push(self, stream, metadata):
-        return None
+        time_stream_push_start = time.time()
+        self.logic.stage_update_label("strm/push")
+        
+        new_stream = deepcopy(stream)
+    
+        for _ in range(8):
+            index = random.randint(0, new_stream.size())
+            random_layer = eval(random.choice(list(icmp6typescls.values())))
+            new_stream[index].add_payload(fuzz(random_layer()))
 
+            _, is_new = self.logic.execute(new_stream, label="stream/push")
+            
+            if is_new:
+                self.stream_push_layer_time = time.time() - time_stream_push_start
+                return new_stream
+
+        self.stream_push_layer_time = time.time() - time_stream_push_start
+        return new_stream
+
+        
     def handle_stream_pop(self, stream, metadata):
-        return None
+        time_stream_pop_start = time.time()
+        self.logic.stage_update_label("strm/pop")
+
+        new_stream = deepcopy(stream)
+        
+        for _ in range(8):
+            index = random.randint(0, new_stream.size())
+            layers_len = len(new_stream[index].layers())
+            remove_payload_from = random.randint(1, layers_len)
+            new_stream[index][remove_payload_from].remove_payload()
+
+            _, is_new = self.logic.execute(new_stream, label="stream/push")
+            
+            if is_new:
+                self.stream_pop_layer_time = time.time() - time_stream_pop_start
+                return new_stream
+
+        self.stream_pop_layer_time = time.time() - time_stream_pop_start
+        return new_stream
 
     def handle_stream_shuffle(self, stream, metadata):
-        return None
+        time_stream_shuffle_start = time.time()
+        self.logic.stage_update_label("strm/shuffle")
+
+        new_stream = deepcopy(stream)
+
+        for _ in range(8):
+            index = random.randint(0, new_stream.size())
+            shuffle_layers = random.shuffle(new_stream[index].layers()[2:])
+            new_stream[index][1].remove_payload()
+            
+            for l in shuffle_layers:
+                new_stream[index].add_payload(fuzz(l))
+            
+            _, is_new = self.logic.execute(new_stream, label="stream/shuffle")
+            
+            if is_new:
+                self.stream_shuffle_time = time.time() - time_stream_shuffle_start
+                return new_stream
+        
+        self.stream_shuffle_time = time.time() - time_stream_shuffle_start
+        return new_stream
 
     def process_node(self, stream, metadata):
         self.init_stage_info()
