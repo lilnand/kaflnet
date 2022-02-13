@@ -98,8 +98,8 @@ class FuzzingStateLogic:
 
         return self.stream_logic.process_node(stream, metadata)
         
-        if results:
-            return results, new_stream
+        if res:
+            return res, new_payload
 
         if metadata["state"]["name"] == "initial":
             new_payload = self.stream_logic.handle_kafl_stage(stream, metadata, self.handle_initial)

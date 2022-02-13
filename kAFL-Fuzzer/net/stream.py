@@ -159,8 +159,11 @@ class StreamStateLogic:
         elif metadata["state"]["name"] == "stream/shuffle":
             new_paylaod = self.handle_stream_shuffle(stream, metadata)
             return self.logic.create_update({"name": "final"}, None), new_paylaod
-        
-        return None, None
+        elif metadata["state"]["name"] == "final":
+            new_stream = self.handle_stream_initial(stream, metadata)
+            return self.logic.create_update({"name": random.choice(rand_states)}, None), new_stream
+        else:
+            raise ValueError("Unknown task stage %s" % metadata["state"]["name"])
 
     def init_stage_info(self):
         self.stream_initial_time = 0
