@@ -105,7 +105,7 @@ class StreamStateLogic:
         
         for _ in range(8):
             index = random.randint(0, new_stream.size()-1)
-            layers_len = len(new_stream[index].layers())
+            layers_len = len(new_stream[index].layers()) - 1
             remove_payload_from = random.randint(1, layers_len)
             new_stream[index][remove_payload_from].remove_payload()
 
