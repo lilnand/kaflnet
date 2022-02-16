@@ -5,37 +5,33 @@ import time
 
 from copy import deepcopy
 from logging import exception
+
+from common.util import read_binary_file
 from scapy.layers.l2 import Ether
 from scapy.packet import Packet, fuzz
 from scapy.utils import rdpcap
 from scapy.layers.inet6 import *
 from scapy.layers.inet6 import _ICMPv6
 
-class bytes_linked_with_stream:
-    def __init__(self, stream, index):
-        self.stream = stream
-        self.indx = index
+class SeedPayload:
+    def __init__(self, config, payload):
+        self.seed = payload
+        self.eth = Ether()
+        self.ip = IPv6()
 
-    def __getitem__(self, key):
-        new_stream = deepcopy(self.stream)
-        new_stream[self.indx] = self.stream[self.indx][key]
-        return bytes_linked_with_stream(new_stream, self.indx)
+        if config:
+            self.netconf = config
+            self._init_base_layers()
 
-    def __setitem__(self, key, val):
-        self.stream[self.indx][key] = val
-
-    def __add__(self, val):
-        return self.stream[self.indx] + val
-
-    def __repr__(self):
-        return str(self.build())
-    
-    def __len__(self):
-        return len(self.stream[self.indx])
+    def _init_base_layers(self):
+        for layer in ['Ether', 'IPv6']:
+            if layer in list(self.netconf.keys()):
+                for field in self.netconf[layer]:
+                    self.packet[layer][field] = self.netconf[layer][field]
 
     def build(self):
-        return self.stream.build()
-
+        return bytes(self.eth / self.ip / Raw(self.seed))
+        
 class StreamStateLogic:
     def __init__(self, slave, logic, config):
         self.slave = slave
@@ -46,7 +42,7 @@ class StreamStateLogic:
         new_stream = deepcopy(stream)
         index = random.randint(0, stream.size() - 1)
         
-        payload = bytes_linked_with_stream(new_stream, index)
+        payload = None#bytes_linked_with_stream(new_stream, index)
 
         return func(payload, metadata)           
         

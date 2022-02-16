@@ -20,7 +20,7 @@ import sys
 
 from common.debug import enable_logging
 from common.self_check import post_self_check
-from common.util import prepare_working_dir, print_fail, print_note, print_warning, copy_seed_files
+from common.util import prepare_working_dir, print_fail, print_note, print_warning, copy_seed_files, read_dict_config
 from fuzzer.process.master import MasterProcess
 from fuzzer.process.slave import slave_loader
 
@@ -56,6 +56,10 @@ def start(config):
     work_dir   = config.argument_values["work_dir"]
     seed_dir   = config.argument_values["seed_dir"]
     num_slaves = config.argument_values['p']
+
+    if config.argument_values['netconf']:
+        config.argument_values['netconf'] = read_dict_config(config.argument_values['netconf'])
+        print(config.argument_values['netconf'])
 
     if config.argument_values['v'] or config.argument_values['debug']:
         enable_logging(work_dir)

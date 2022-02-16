@@ -61,12 +61,6 @@ def parse_is_file(dirname):
     else:
         return dirname
 
-def parse_is_mac(macaddr):
-    if not re.match("[0-9a-f]{2}([-:]?)[0-9a-f]{2}(\\1[0-9a-f]{2}){4}$", macaddr.lower()):
-        msg = "{0} is not a mac addr".format(macaddr)
-        raise argparse.ArgumentTypeError(msg)
-
-    return macaddr
 
 def parse_ignore_range(string):
     m = re.match(r"(\d+)(?:-(\d+))?$", string)
@@ -148,10 +142,8 @@ def add_args_fuzzer(parser):
                         type=int, required=False, default=None)
     parser.add_argument('-abort_exec', metavar='<n>', help="exit after max executions",
                         type=int, required=False, default=None)
-    parser.add_argument('-dstmac', metavar='<mac>', help="Ethernet destination mac",
-                        required=False, type=parse_is_mac)
-    parser.add_argument('-dstip', metavar='<ipv6>', help="Destination IPv6",
-                        required=False) 
+    parser.add_argument('-netconf', metavar='<json_file>', help="Json file describing the Ethernet & IPv6 fields",
+                        required=False, type=parse_is_file)
 
 
 # Qemu/Slave-specific launch options

@@ -25,7 +25,7 @@ from fuzzer.technique.redqueen.mod import RedqueenInfoGatherer
 from fuzzer.technique.redqueen.workdir import RedqueenWorkdir
 from fuzzer.technique.trim import perform_trim, perform_center_trim
 from fuzzer.technique.helper import rand
-from net.stream import StreamStateLogic
+from net.stream import StreamStateLogic, SeedPayload
 
 class FuzzingStateLogic:
     HAVOC_MULTIPLIER = 2
@@ -89,32 +89,29 @@ class FuzzingStateLogic:
 
         return ret
 
-    def process_node(self, stream, metadata):
+    def process_node(self, payload, metadata):
         self.init_stage_info(metadata)
 
         if metadata["state"]["name"] == "import":
-            self.handle_import(stream, metadata)
+            self.handle_import(payload, metadata)
             return None, None
-
-        return self.stream_logic.process_node(stream, metadata)
-        
-        if res:
-            return res, new_payload
-
-        if metadata["state"]["name"] == "initial":
-            new_payload = self.stream_logic.handle_kafl_stage(stream, metadata, self.handle_initial)
+        elif metadata["state"]["name"] == "initial":
+            new_payload = self.handle_initial(payload, metadata)
             return self.create_update({"name": "redq/grim"}, None), new_payload
         elif metadata["state"]["name"] == "redq/grim":
-            grimoire_info = self.stream_logic.handle_kafl_stage(stream, metadata, self.handle_grimoire_inference)
-            self.stream_logic.handle_kafl_stage(stream, metadata, self.handle_redqueen)
+            grimoire_info = self.handle_grimoire_inference(payload, metadata)
+            self.handle_redqueen(payload, metadata)
             return self.create_update({"name": "deterministic"}, {"grimoire": grimoire_info}), None
         elif metadata["state"]["name"] == "deterministic":
-            resume, afl_det_info = self.stream_logic.handle_kafl_stage(stream, metadata, self.handle_deterministic)
+            resume, afl_det_info = self.handle_deterministic(payload, metadata)
             if resume:
                 return self.create_update({"name": "deterministic"}, {"afl_det_info": afl_det_info}), None
             return self.create_update({"name": "havoc"}, {"afl_det_info": afl_det_info}), None
-        elif metadata["state"]["name"] in ["havoc", "final"]:
-            self.stream_logic.handle_kafl_stage(stream, metadata, self.handle_havoc)
+        elif metadata["state"]["name"] == "havoc":
+            self.handle_havoc(payload, metadata)
+            return self.create_update({"name": "final"}, None), None
+        elif metadata["state"]["name"] == "final":
+            self.handle_havoc(payload, metadata)
             return self.create_update({"name": "final"}, None), None
         else:
             raise ValueError("Unknown task stage %s" % metadata["state"]["name"])
@@ -168,13 +165,13 @@ class FuzzingStateLogic:
             info.update(extra_info)
         return info
 
-    def handle_import(self, stream, metadata):
+    def handle_import(self, payload, metadata):
         # TODO: We seem to have some corner case where PT feedback does not
         # work and the seed has to be provided multiple times to actually
         # (eventually) be recognized correctly..
         retries = 4
         for _ in range(retries):
-            _, is_new = self.execute(stream, label="import")
+            _, is_new = self.execute(payload, label="import")
             if is_new: break
 
         # Inform user if seed yields no new coverage. This may happen if -ip0 is
@@ -321,14 +318,14 @@ class FuzzingStateLogic:
         return self.slave.validate_bytes(stream, metadata, parent_info)
 
 
-    def execute(self, stream, label=None, extra_info=None):
+    def execute(self, payload, label=None, extra_info=None):
 
         self.stage_info_execs += 1
         if label and label != self.stage_info["method"]:
             self.stage_update_label(label)
 
         parent_info = self.get_parent_info(extra_info)
-        bitmap, is_new = self.slave.execute(stream, parent_info)
+        bitmap, is_new = self.slave.execute(payload, parent_info)
         if is_new:
             self.stage_info_findings += 1
         return bitmap, is_new

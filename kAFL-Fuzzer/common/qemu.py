@@ -743,8 +743,7 @@ class qemu:
             return False
         return True
 
-    def set_payload(self, stream):
-        payload = stream.build()
+    def set_payload(self, payload):
         if self.exiting:
             sys.exit(0)
 

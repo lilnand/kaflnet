@@ -16,7 +16,7 @@ from   pprint import pformat
 import mmh3
 
 from common.debug import log_master
-from common.util import read_binary_file, print_note
+from common.util import print_note, read_binary_file
 from common.execution_result import ExecutionResult
 from fuzzer.communicator import ServerConnection, MSG_NODE_DONE, MSG_NEW_INPUT, MSG_READY
 from fuzzer.queue import InputQueue
@@ -24,18 +24,17 @@ from fuzzer.statistics import MasterStatistics
 from fuzzer.technique.redqueen.cmp import redqueen_global_config
 from fuzzer.bitmap import BitmapStorage
 from fuzzer.node import QueueNode
-from net.stream import Stream
+from net.stream import SeedPayload, Stream
 
 class MasterProcess:
 
     def __init__(self, config):
         self.config = config
         self.comm = ServerConnection(self.config)
-        self.debug_mode = config.argument_values['debug']
+        self.debug_mode = config.argument_values['debug'] 
 
         self.busy_events = 0
         self.empty_hash = mmh3.hash(("\x00" * self.config.config_values['BITMAP_SHM_SIZE']), signed=False)
-
 
         self.statistics = MasterStatistics(self.config)
         self.queue = InputQueue(self.config, self.statistics)
@@ -49,7 +48,12 @@ class MasterProcess:
 
         log_master("Starting (pid: %d)" % os.getpid())
         log_master("Configuration dump:\n%s" %
-                pformat(config.argument_values, indent=4, compact=True))
+                pformat(config.argument_values, indent=4, compact=True))    
+
+    def handle_seed_payload_file(self, path):
+        payload = read_binary_file(path)
+        os.remove(path)
+        return payload
 
     def send_next_task(self, conn):
         # Inputs placed to imports/ folder have priority.
@@ -57,15 +61,15 @@ class MasterProcess:
         imports = glob.glob(self.config.argument_values['work_dir'] + "/imports/*")
         if imports:
             path = imports.pop()
-            print("Importing payload from %s" % path)
-
-            try:
-                stream = Stream(self.config, pcap_file=path)
-            except exception as e:
-                print(e)
-            #seed = read_binary_file(path)
-            os.remove(path)
-            return self.comm.send_import(conn, {"type": "import", "payload": stream})
+            
+            if os.path.isdir(path):
+                #handle_direcoty
+                pass
+                #os.rmdir(path)
+            else:
+                payload = self.handle_seed_payload_file(path)
+            
+            return self.comm.send_import(conn, {"type": "import", "payload": payload})
         # Process items from queue..
         node = self.queue.get_next()
         if node:
@@ -93,7 +97,7 @@ class MasterProcess:
                     self.send_next_task(conn)
                 elif msg["type"] == MSG_NEW_INPUT:
                     # Slave reports new interesting input
-                    if False and self.debug_mode:
+                    if self.debug_mode:
                         log_master("Received new input (exit=%s): %s" % (
                             msg["input"]["info"]["exit_reason"],
                             repr(msg["input"]["payload"][:24])))
@@ -124,7 +128,7 @@ class MasterProcess:
             if n_limit < self.statistics.data['total_execs']:
                 raise SystemExit("Exit on max execs.")
 
-    def maybe_insert_node(self, stream, bitmap_array, node_struct):
+    def maybe_insert_node(self, payload, bitmap_array, node_struct):
         bitmap = ExecutionResult.bitmap_from_bytearray(bitmap_array, node_struct["info"]["exit_reason"],
                                                        node_struct["info"]["performance"])
         bitmap.lut_applied = True  # since we received the bitmap from the slave, the lut was already applied
@@ -132,7 +136,7 @@ class MasterProcess:
         should_store, new_bytes, new_bits = self.bitmap_storage.should_store_in_queue(bitmap)
         new_data = bitmap.copy_to_array()
         if should_store:
-            node = QueueNode(stream, bitmap_array, node_struct, write=False)
+            node = QueueNode(payload, bitmap_array, node_struct, write=False)
             node.set_new_bytes(new_bytes, write=False)
             node.set_new_bits(new_bits, write=False)
             self.queue.insert_input(node, bitmap)

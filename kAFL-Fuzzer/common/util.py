@@ -9,10 +9,12 @@ import shutil
 import sys
 import tempfile
 import string
+import ast
 from shutil import copyfile
 
 from common import color
 
+from net.stream import SeedPayload
 class Singleton(type):
     _instances = {}
 
@@ -63,6 +65,12 @@ def find_diffs(data_a, data_b):
             last_diff = i
     return first_diff, last_diff
 
+def read_dict_config(filename):
+    with open(filename, 'r') as f:
+        data = f.read()
+        conf = ast.literal_eval(data)
+        return conf
+
 def prepare_working_dir(config):
 
     work_dir   = config.argument_values["work_dir"]
@@ -108,6 +116,7 @@ def copy_seed_files(working_directory, seed_directory):
             path = os.path.join(directory, f)
             if os.path.exists(path):
                 try:
+                    seed_payload = SeedPayload(path)
                     copyfile(path, working_directory + "/imports/" + "seed_%05d" % i)
                     i += 1
                 except PermissionError:

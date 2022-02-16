@@ -105,13 +105,8 @@ class SlaveProcess:
     def handle_node(self, msg):
         meta_data = QueueNode.get_metadata(msg["task"]["nid"])
         payload = QueueNode.get_payload(meta_data["info"]["exit_reason"], meta_data["id"])
-
-        try:
-            stream = Stream(self.config, node_payload=payload)
-        except exception as e:
-            print(e)
             
-        results, new_payload = self.logic.process_node(stream, meta_data)
+        results, new_payload = self.logic.process_node(payload, meta_data)
         if new_payload:
             default_info = {"method": "validate_bits", "parent": meta_data["id"]}
             if self.validate_bits(new_payload, meta_data, default_info):
@@ -237,29 +232,28 @@ class SlaveProcess:
 
         return exec_res
 
-    def __execute(self, stream, retry=0, is_stream=False):
-
+    def __execute(self, payload, retry=0):
         try:
-            self.q.set_payload(stream)
+            self.q.set_payload(payload)
             return self.q.send_payload()
         except (ValueError, BrokenPipeError):
             if retry > 2:
                 # TODO if it reliably kills qemu, perhaps log to master for harvesting..
                 print_fail("Slave %d aborting due to repeated SHM/socket error. Check logs." % self.slave_id)
-                log_slave("Aborting due to repeated SHM/socket error. Payload: %s" % repr(stream), self.slave_id)
+                log_slave("Aborting due to repeated SHM/socket error. Payload: %s" % repr(payload), self.slave_id)
                 raise
             print_warning("SHM/socket error on Slave %d (retry %d)" % (self.slave_id, retry))
             log_slave("SHM/socket error, trying to restart qemu...", self.slave_id)
             self.statistics.event_reload()
             if not self.q.restart():
                 raise
-        return self.__execute(stream, retry=retry+1)
+        return self.__execute(payload, retry=retry+1)
 
 
-    def execute(self, stream, info, is_stream=False):
+    def execute(self, payload, info, is_stream=False):
         self.statistics.event_exec()
 
-        exec_res = self.__execute(stream)
+        exec_res = self.__execute(payload)
 
         is_new_input = self.bitmap_storage.should_send_to_master(exec_res)
         crash = exec_res.is_crash()
@@ -271,15 +265,15 @@ class SlaveProcess:
             if not crash:
                 assert exec_res.is_lut_applied()
                 if self.config.argument_values["funky"]:
-                    stable = self.funky_validate(stream, exec_res)
+                    stable = self.funky_validate(payload, exec_res)
                 else:
-                    stable = self.quick_validate(stream, exec_res)
+                    stable = self.quick_validate(payload, exec_res)
 
                 if not stable:
                     # TODO: auto-throttle persistent runs based on funky rate?
                     self.statistics.event_funky()
             if crash or stable:
-                self.__send_to_master(stream, exec_res, info)
+                self.__send_to_master(payload, exec_res, info)
         else:
             if crash:
                 log_slave("Crashing input found (%s), but not new (discarding)" % (exec_res.exit_reason), self.slave_id)
