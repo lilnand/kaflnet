@@ -59,7 +59,6 @@ def start(config):
 
     if config.argument_values['netconf']:
         config.argument_values['netconf'] = read_dict_config(config.argument_values['netconf'])
-        print(config.argument_values['netconf'])
 
     if config.argument_values['v'] or config.argument_values['debug']:
         enable_logging(work_dir)

@@ -116,7 +116,6 @@ def copy_seed_files(working_directory, seed_directory):
             path = os.path.join(directory, f)
             if os.path.exists(path):
                 try:
-                    seed_payload = SeedPayload(path)
                     copyfile(path, working_directory + "/imports/" + "seed_%05d" % i)
                     i += 1
                 except PermissionError:

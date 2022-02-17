@@ -319,13 +319,15 @@ class FuzzingStateLogic:
 
 
     def execute(self, payload, label=None, extra_info=None):
+        netconf = self.config.argument_values['netconf']
+        seed = SeedPayload(netconf, payload)
 
         self.stage_info_execs += 1
         if label and label != self.stage_info["method"]:
             self.stage_update_label(label)
 
         parent_info = self.get_parent_info(extra_info)
-        bitmap, is_new = self.slave.execute(payload, parent_info)
+        bitmap, is_new = self.slave.execute(seed.build(), parent_info)
         if is_new:
             self.stage_info_findings += 1
         return bitmap, is_new

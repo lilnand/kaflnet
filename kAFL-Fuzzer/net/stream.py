@@ -30,7 +30,10 @@ class SeedPayload:
                     self.packet[layer][field] = self.netconf[layer][field]
 
     def build(self):
-        return bytes(self.eth / self.ip / Raw(self.seed))
+        packet = bytes(self.eth / self.ip / Raw(self.seed))
+        caplen = len(packet)
+        wirelen = caplen
+        return struct.pack("IIII", 0, 0, caplen, wirelen) + packet
         
 class StreamStateLogic:
     def __init__(self, slave, logic, config):
