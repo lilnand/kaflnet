@@ -6,7 +6,6 @@ import time
 from copy import deepcopy
 from logging import exception
 
-from common.util import read_binary_file
 from scapy.layers.l2 import Ether
 from scapy.packet import Packet, fuzz
 from scapy.utils import rdpcap
