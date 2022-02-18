@@ -17,6 +17,7 @@ class Stream:
         self.seeds = []
         self.eth = Ether()
         self.ip = IPv6()
+        self.packet = {'Ether': self.eth, 'IPv6': self.ip}
 
         if config:
             self.netconf = config
@@ -26,7 +27,7 @@ class Stream:
         for layer in ['Ether', 'IPv6']:
             if layer in list(self.netconf.keys()):
                 for field in self.netconf[layer]:
-                    self.packet[layer][field] = self.netconf[layer][field]
+                    self.packet[layer].fields[field] = self.netconf[layer][field]
 
     def push(self, payload):
         self.seeds.append(payload)
