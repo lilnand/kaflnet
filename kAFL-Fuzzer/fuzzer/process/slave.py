@@ -77,10 +77,12 @@ class SlaveProcess:
         self.statistics = SlaveStatistics(self.slave_id, self.config)
         self.logic = FuzzingStateLogic(self, self.config)
         self.conn = connection
+        self.current_stream = None
 
         self.bitmap_storage = BitmapStorage(self.config, self.config.config_values['BITMAP_SHM_SIZE'], "master")
 
     def handle_import(self, msg):
+        self.current_stream = msg["task"]["stream"]
         meta_data = {"state": {"name": "import"}, "id": 0}
         payload = msg["task"]["payload"]
         self.logic.process_node(payload, meta_data)
@@ -105,7 +107,13 @@ class SlaveProcess:
     def handle_node(self, msg):
         meta_data = QueueNode.get_metadata(msg["task"]["nid"])
         payload = QueueNode.get_payload(meta_data["info"]["exit_reason"], meta_data["id"])
-            
+        
+        stream = Stream(self.config.config_values['netconf'])
+        stream.loads(payload)
+
+        payload = stream.pop()
+        self.current_stream = stream
+
         results, new_payload = self.logic.process_node(payload, meta_data)
         if new_payload:
             default_info = {"method": "validate_bits", "parent": meta_data["id"]}
@@ -117,7 +125,9 @@ class SlaveProcess:
                 log_slave("Provided alternative payload found invalid - bug in stage %s?"
                           % meta_data["state"]["name"],
                           self.slave_id)
-        self.conn.send_node_done(meta_data["id"], results, new_payload)
+
+        stream.push(new_payload)
+        self.conn.send_node_done(meta_data["id"], results, stream)
 
     def loop(self):
         if not self.q.start():
@@ -250,10 +260,13 @@ class SlaveProcess:
         return self.__execute(payload, retry=retry+1)
 
 
-    def execute(self, payload, info, is_stream=False):
+    def execute(self, payload, info):
         self.statistics.event_exec()
+        stream = self.current_stream
+        stream.push(payload)
 
-        exec_res = self.__execute(payload)
+        payload_to_exec = stream.build()
+        exec_res = self.__execute(payload_to_exec)
 
         is_new_input = self.bitmap_storage.should_send_to_master(exec_res)
         crash = exec_res.is_crash()
@@ -265,15 +278,15 @@ class SlaveProcess:
             if not crash:
                 assert exec_res.is_lut_applied()
                 if self.config.argument_values["funky"]:
-                    stable = self.funky_validate(payload, exec_res)
+                    stable = self.funky_validate(payload_to_exec, exec_res)
                 else:
-                    stable = self.quick_validate(payload, exec_res)
+                    stable = self.quick_validate(payload_to_exec, exec_res)
 
                 if not stable:
                     # TODO: auto-throttle persistent runs based on funky rate?
                     self.statistics.event_funky()
             if crash or stable:
-                self.__send_to_master(payload, exec_res, info)
+                self.__send_to_master(stream, exec_res, info)
         else:
             if crash:
                 log_slave("Crashing input found (%s), but not new (discarding)" % (exec_res.exit_reason), self.slave_id)

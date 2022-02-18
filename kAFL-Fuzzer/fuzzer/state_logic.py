@@ -25,7 +25,7 @@ from fuzzer.technique.redqueen.mod import RedqueenInfoGatherer
 from fuzzer.technique.redqueen.workdir import RedqueenWorkdir
 from fuzzer.technique.trim import perform_trim, perform_center_trim
 from fuzzer.technique.helper import rand
-from net.stream import StreamStateLogic, SeedPayload
+from net.stream import StreamStateLogic
 
 class FuzzingStateLogic:
     HAVOC_MULTIPLIER = 2
@@ -320,14 +320,13 @@ class FuzzingStateLogic:
 
     def execute(self, payload, label=None, extra_info=None):
         netconf = self.config.argument_values['netconf']
-        seed = SeedPayload(netconf, payload)
 
         self.stage_info_execs += 1
         if label and label != self.stage_info["method"]:
             self.stage_update_label(label)
 
         parent_info = self.get_parent_info(extra_info)
-        bitmap, is_new = self.slave.execute(seed.build(), parent_info)
+        bitmap, is_new = self.slave.execute(payload, parent_info)
         if is_new:
             self.stage_info_findings += 1
         return bitmap, is_new

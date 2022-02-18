@@ -80,7 +80,7 @@ class ClientConnection:
 
     def send_new_input(self, data, bitmap, info):
         self.sock.send_bytes(
-            pickle.dumps({"type": MSG_NEW_INPUT, "input": {"payload": data, "bitmap": bitmap, "info": info}}))
+            pickle.dumps({"type": MSG_NEW_INPUT, "input": {"payload": data.build(), "stream": data, "bitmap": bitmap, "info": info}}))
 
     def send_node_done(self, node_id, results, new_payload):
         self.sock.send_bytes(pickle.dumps(

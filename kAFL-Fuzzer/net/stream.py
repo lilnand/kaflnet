@@ -12,9 +12,9 @@ from scapy.utils import rdpcap
 from scapy.layers.inet6 import *
 from scapy.layers.inet6 import _ICMPv6
 
-class SeedPayload:
-    def __init__(self, config, payload):
-        self.seed = payload
+class Stream:
+    def __init__(self, config):
+        self.seeds = []
         self.eth = Ether()
         self.ip = IPv6()
 
@@ -28,12 +28,40 @@ class SeedPayload:
                 for field in self.netconf[layer]:
                     self.packet[layer][field] = self.netconf[layer][field]
 
+    def push(self, payload):
+        self.seeds.append(payload)
+
+    def pop(self):
+        return self.seeds.pop()
+
+    def loads(self, payload):
+        """
+        load stream payload
+        """
+        self.seeds.clear()
+
+        base_len = len(bytes(self.eth / self.ip))
+        pos = 0
+
+        while pos < len(payload):
+            _, _, _, packet_len = struct.unpack("IIII", payload[pos:][16])
+            pos += 16 + base_len
+            seed_len = packet_len - base_len
+
+            seed = payload[pos:][:seed_len]
+            self.push(seed)
+            pos += seed_len
+
     def build(self):
-        packet = bytes(self.eth / self.ip / Raw(self.seed))
-        caplen = len(packet)
-        wirelen = caplen
-        return struct.pack("IIII", 0, 0, caplen, wirelen) + packet
+        stream_buff = b''
+
+        for p in self.seeds:
+            packet = bytes(self.eth / self.ip / Raw(p))
+            caplen = len(packet)
+            wirelen = caplen
+            stream_buff += struct.pack("IIII", 0, 0, caplen, wirelen) + packet
         
+        return stream_buff        
 class StreamStateLogic:
     def __init__(self, slave, logic, config):
         self.slave = slave
@@ -169,7 +197,7 @@ class StreamStateLogic:
         self.stream_pop_layer_time = 0
         self.stream_shuffle_time = 0
 
-class Stream:
+class _Stream:
     DEFAULT_SRC_MAC = '00:50:56:C0:00:08'
     IPV6_ETHER_TYPE = 0x86dd
 

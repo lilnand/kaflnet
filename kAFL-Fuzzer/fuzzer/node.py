@@ -95,8 +95,9 @@ class QueueNode:
         self.update_file(write=True)
 
     def set_payload(self, stream, write=True):
-        self.set_payload_len(len(stream), write=False)
-        atomic_write(QueueNode.__get_payload_filename(self.get_exit_reason(), self.get_id()), bytes(stream))
+        payload = stream.build()
+        self.set_payload_len(len(payload), write=False)
+        atomic_write(QueueNode.__get_payload_filename(self.get_exit_reason(), self.get_id()), payload)
 
     def get_payload_len(self):
         return self.node_struct["payload_len"]

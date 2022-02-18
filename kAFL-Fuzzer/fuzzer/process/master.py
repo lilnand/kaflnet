@@ -24,7 +24,7 @@ from fuzzer.statistics import MasterStatistics
 from fuzzer.technique.redqueen.cmp import redqueen_global_config
 from fuzzer.bitmap import BitmapStorage
 from fuzzer.node import QueueNode
-from net.stream import SeedPayload, Stream
+from net.stream import Stream
 
 class MasterProcess:
 
@@ -50,11 +50,6 @@ class MasterProcess:
         log_master("Configuration dump:\n%s" %
                 pformat(config.argument_values, indent=4, compact=True))    
 
-    def handle_seed_payload_file(self, path):
-        payload = read_binary_file(path)
-        os.remove(path)
-        return payload
-
     def send_next_task(self, conn):
         # Inputs placed to imports/ folder have priority.
         # This can also be used to inject additional seeds at runtime.
@@ -63,13 +58,18 @@ class MasterProcess:
             path = imports.pop()
             
             if os.path.isdir(path):
-                #handle_direcoty
-                pass
-                #os.rmdir(path)
+                payloads = glob.glob(path + "/*")
+                stream = Stream(self.config.argument_values['netconf'])
+                
+                for p in payloads:
+                    stream.push(p)
+                
+                payload = stream.pop()
             else:
-                payload = self.handle_seed_payload_file(path)
+                payload = read_binary_file(path)
+                stream = Stream(self.config.argument_values['netconf'])
             
-            return self.comm.send_import(conn, {"type": "import", "payload": payload})
+            return self.comm.send_import(conn, {"type": "import", "stream": stream, "payload": payload})
         # Process items from queue..
         node = self.queue.get_next()
         if node:
@@ -101,8 +101,8 @@ class MasterProcess:
                         log_master("Received new input (exit=%s): %s" % (
                             msg["input"]["info"]["exit_reason"],
                             repr(msg["input"]["payload"][:24])))
-                    node_struct = {"info": msg["input"]["info"], "state": {"name": "stream/initial"}}
-                    self.maybe_insert_node(msg["input"]["payload"], msg["input"]["bitmap"], node_struct)
+                    node_struct = {"info": msg["input"]["info"], "state": {"name": "initial"}}
+                    self.maybe_insert_node(msg["input"]["stream"], msg["input"]["bitmap"], node_struct)
                 elif msg["type"] == MSG_READY:
                     # Initial slave hello, send first task...
                     # log_master("Slave is ready..")
