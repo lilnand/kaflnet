@@ -14,7 +14,6 @@ from shutil import copyfile
 
 from common import color
 
-from net.stream import SeedPayload
 class Singleton(type):
     _instances = {}
 
