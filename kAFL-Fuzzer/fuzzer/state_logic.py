@@ -319,8 +319,6 @@ class FuzzingStateLogic:
 
 
     def execute(self, payload, label=None, extra_info=None):
-        netconf = self.config.argument_values['netconf']
-
         self.stage_info_execs += 1
         if label and label != self.stage_info["method"]:
             self.stage_update_label(label)
