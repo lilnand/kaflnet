@@ -10,10 +10,11 @@ from scapy.layers.l2 import Ether
 from scapy.packet import Packet, fuzz
 from scapy.utils import rdpcap
 from scapy.layers.inet6 import *
-from scapy.layers.inet6 import _ICMPv6
+from scapy.layers.inet6 import _ICMPv6, ICMPv6Unknown, icmp6typescls
 
 class Stream:
     def __init__(self, config):
+        self.fuzzseed = None
         self.seeds = []
         self.eth = Ether()
         self.ip = IPv6()
@@ -29,23 +30,31 @@ class Stream:
                 for field in self.netconf[layer]:
                     self.packet[layer].fields[field] = self.netconf[layer][field]
 
+    def set_fuzz(self, fuzzseed):
+        self.fuzzseed = fuzzseed
+
+    def get_fuzz_seed(self):
+        return self.fuzzseed
+
     def push(self, payload):
         self.seeds.append(payload)
 
     def pop(self):
         return self.seeds.pop()
 
+    def is_empty(self):
+        return self.fuzzseed == None
+
     def loads(self, payload):
         """
         load stream payload
         """
         self.seeds.clear()
-
         base_len = len(bytes(self.eth / self.ip))
         pos = 0
 
         while pos < len(payload):
-            _, _, _, packet_len = struct.unpack("IIII", payload[pos:][16])
+            _, _, _, packet_len = struct.unpack("IIII", payload[pos:][:16])
             pos += 16 + base_len
             seed_len = packet_len - base_len
 
@@ -53,16 +62,57 @@ class Stream:
             self.push(seed)
             pos += seed_len
 
+        if len(self.seeds):
+            self.fuzzseed = self.pop()
+
+    def _build_icmp_type_cls(self, payload, _cls):
+        print(payload)
+        print(_cls)
+        _cls_obj = _cls(payload)
+
+        if not _cls == Raw:
+            _cls_obj.cksum = 0
+            uplen = len(_cls_obj)
+            ph6 = PseudoIPv6(src=self.ip.src, dst=self.ip.dst, nh=58, uplen=uplen)
+            _cls_obj.cksum = checksum(raw(ph6 / _cls_obj))
+        
+        packet = self.eth / self.ip / _cls_obj                
+        packet['IPv6'].plen = len(_cls_obj)
+        
+        return packet
+
     def build(self):
         stream_buff = b''
+        cur_seeds = self.seeds + [self.fuzzseed]
 
-        for p in self.seeds:
-            packet = bytes(self.eth / self.ip / Raw(p))
-            caplen = len(packet)
-            wirelen = caplen
-            stream_buff += struct.pack("IIII", 0, 0, caplen, wirelen) + packet
-        
-        return stream_buff        
+        for p in cur_seeds:
+            cls_type = p[0]
+
+            if cls_type in list(icmp6typescls.keys()):
+                if len(p) < icmp6typesminhdrlen[cls_type] and len(p) != 3:
+                    _cls = ICMPv6Unknown
+                elif len(p) == 3:
+                    _cls = Raw
+                else:
+                    _cls = icmp6typescls[cls_type]
+            else:
+                if len(p) == 3:
+                    _cls = Raw
+                else:
+                    _cls = ICMPv6Unknown
+
+            packet = self._build_icmp_type_cls(p, _cls)
+            packet_bytes = bytes(packet) 
+            wirelen = len(packet_bytes)
+            stream_buff += struct.pack("IIII", 0, 0, wirelen, wirelen) + packet_bytes
+
+        return stream_buff       
+
+    def show(self):
+        pass
+        #print(self.build()[16:])
+        #Ether(self.build()[16:]).show()
+
 class StreamStateLogic:
     def __init__(self, slave, logic, config):
         self.slave = slave

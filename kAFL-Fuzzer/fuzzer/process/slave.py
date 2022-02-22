@@ -17,8 +17,10 @@ import time
 import signal
 import sys
 import shutil
+import struct
 
 import lz4.frame as lz4
+from scapy.layers.l2 import Ether
 
 from common.config import FuzzerConfiguration
 from common.debug import log_slave
@@ -85,6 +87,7 @@ class SlaveProcess:
         self.current_stream = msg["task"]["stream"]
         meta_data = {"state": {"name": "import"}, "id": 0}
         payload = msg["task"]["payload"]
+        self.current_stream.set_fuzz(payload)
         self.logic.process_node(payload, meta_data)
         self.conn.send_ready()
 
@@ -108,13 +111,11 @@ class SlaveProcess:
         meta_data = QueueNode.get_metadata(msg["task"]["nid"])
         payload = QueueNode.get_payload(meta_data["info"]["exit_reason"], meta_data["id"])
         
-        stream = Stream(self.config.config_values['netconf'])
+        stream = Stream(self.config.argument_values['netconf'])
         stream.loads(payload)
-
-        payload = stream.pop()
         self.current_stream = stream
 
-        results, new_payload = self.logic.process_node(payload, meta_data)
+        results, new_payload = self.logic.process_node(stream.get_fuzz_seed(), meta_data)
         if new_payload:
             default_info = {"method": "validate_bits", "parent": meta_data["id"]}
             if self.validate_bits(new_payload, meta_data, default_info):
@@ -126,7 +127,6 @@ class SlaveProcess:
                           % meta_data["state"]["name"],
                           self.slave_id)
 
-        stream.push(new_payload)
         self.conn.send_node_done(meta_data["id"], results, stream)
 
     def loop(self):
@@ -263,14 +263,14 @@ class SlaveProcess:
     def execute(self, payload, info):
         self.statistics.event_exec()
         stream = self.current_stream
-        stream.push(payload)
+        stream.set_fuzz(payload)
 
         payload_to_exec = stream.build()
         exec_res = self.__execute(payload_to_exec)
 
         is_new_input = self.bitmap_storage.should_send_to_master(exec_res)
         crash = exec_res.is_crash()
-        stable = False;
+        stable = False
 
         # store crashes and any validated new behavior
         # do not validate timeouts and crashes at this point as they tend to be nondeterministic

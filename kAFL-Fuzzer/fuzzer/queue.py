@@ -92,7 +92,7 @@ class InputQueue:
         node = self.get_node_by_id(nid)
         self.statistics.event_node_update(node, results)
         node.update_metadata(results)
-        if new_payload:
+        if new_payload.is_empty():
             node.set_payload(new_payload)
         node.set_free()
         self.maybe_pushback_to_cycle(node)

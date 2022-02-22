@@ -56,10 +56,10 @@ class MasterProcess:
         imports = glob.glob(self.config.argument_values['work_dir'] + "/imports/*")
         if imports:
             path = imports.pop()
+            stream = Stream(self.config.argument_values['netconf'])
             
             if os.path.isdir(path):
-                payloads = glob.glob(path + "/*")
-                stream = Stream(self.config.argument_values['netconf'])
+                payloads = glob.glob(path + "/*")      
                 
                 for p in payloads:
                     stream.push(p)
@@ -67,8 +67,8 @@ class MasterProcess:
                 payload = stream.pop()
             else:
                 payload = read_binary_file(path)
-                stream = Stream(self.config.argument_values['netconf'])
-            
+                os.remove(path)
+                      
             return self.comm.send_import(conn, {"type": "import", "stream": stream, "payload": payload})
         # Process items from queue..
         node = self.queue.get_next()
@@ -97,7 +97,7 @@ class MasterProcess:
                     self.send_next_task(conn)
                 elif msg["type"] == MSG_NEW_INPUT:
                     # Slave reports new interesting input
-                    if self.debug_mode:
+                    if False and self.debug_mode:
                         log_master("Received new input (exit=%s): %s" % (
                             msg["input"]["info"]["exit_reason"],
                             repr(msg["input"]["payload"][:24])))
