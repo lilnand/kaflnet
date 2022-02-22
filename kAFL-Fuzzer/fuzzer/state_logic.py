@@ -78,10 +78,6 @@ class FuzzingStateLogic:
         ret["state_time_grimoire"] = self.grimoire_time
         ret["state_time_grimoire_inference"] = self.grimoire_inference_time
         ret["state_time_redqueen"] = self.redqueen_time
-        ret["stream_initial_time"] = self.stream_logic.stream_initial_time
-        ret["stream_push_layer_time"] = self.stream_logic.stream_push_layer_time
-        ret["stream_pop_layer_time"] = self.stream_logic.stream_pop_layer_time
-        ret["stream_shuffle_time"] = self.stream_logic.stream_shuffle_time
         ret["performance"] = self.performance
 
         if additional_data:
@@ -91,6 +87,10 @@ class FuzzingStateLogic:
 
     def process_node(self, payload, metadata):
         self.init_stage_info(metadata)
+
+        if not payload:
+            print("Empty payload")
+            return self.create_update({"name": "empty"}, None), None
 
         if metadata["state"]["name"] == "import":
             self.handle_import(payload, metadata)
@@ -319,8 +319,6 @@ class FuzzingStateLogic:
 
 
     def execute(self, payload, label=None, extra_info=None):
-        netconf = self.config.argument_values['netconf']
-
         self.stage_info_execs += 1
         if label and label != self.stage_info["method"]:
             self.stage_update_label(label)

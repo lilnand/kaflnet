@@ -80,8 +80,7 @@ class QueueNode:
         old_data["attention_secs"] = old_data.get("attention_secs", 0) + new_data["attention_secs"]
 
         for key in ["state_time_initial", "state_time_havoc", "state_time_grimoire", "state_time_grimoire_inference",
-                    "state_time_redqueen", "stream_initial_time", "stream_push_layer_time", "stream_pop_layer_time",
-                    "stream_shuffle_time"]:
+                    "state_time_redqueen"]:
             old_data[key] = old_data.get(key, 0) + new_data[key]
             del new_data[key]
 
