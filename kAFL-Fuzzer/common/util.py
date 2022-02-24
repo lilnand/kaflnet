@@ -9,6 +9,7 @@ import shutil
 import sys
 import tempfile
 import string
+import random
 import ast
 from shutil import copyfile
 
@@ -69,6 +70,10 @@ def read_dict_config(filename):
         data = f.read()
         conf = ast.literal_eval(data)
         return conf
+
+def get_random_string(length):
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for x in range(length)) + '_'
 
 def prepare_working_dir(config):
 

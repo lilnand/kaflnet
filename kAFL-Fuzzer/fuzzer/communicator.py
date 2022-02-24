@@ -78,9 +78,9 @@ class ClientConnection:
     def send_ready(self):
         self.sock.send_bytes(pickle.dumps({"type": MSG_READY, "client_id": self.id}))
 
-    def send_new_input(self, data, bitmap, info):
+    def send_new_input(self, stream, bitmap, info):
         self.sock.send_bytes(
-            pickle.dumps({"type": MSG_NEW_INPUT, "input": {"payload": data.build(), "stream": data, "bitmap": bitmap, "info": info}}))
+            pickle.dumps({"type": MSG_NEW_INPUT, "input": {"payload": stream.build(), "stream": stream, "bitmap": bitmap, "info": info}}))
 
     def send_node_done(self, node_id, results, new_payload):
         self.sock.send_bytes(pickle.dumps(

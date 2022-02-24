@@ -59,12 +59,21 @@ class MasterProcess:
             stream = Stream(self.config.argument_values['netconf'])
             
             if os.path.isdir(path):
+                
                 payloads = glob.glob(path + "/*")      
-                
-                for p in payloads:
-                    stream.push(p)
-                
+                payloads.sort(reverse=True)
+
+                while payloads:
+                    
+                    current_payload_path = payloads.pop()
+                    
+                    with open(current_payload_path, 'rb') as f:
+                        
+                        current_payload = f.read()
+                        stream.push(current_payload)
+
                 payload = stream.pop()
+                os.rmdir(path)
             else:
                 payload = read_binary_file(path)
                 os.remove(path)

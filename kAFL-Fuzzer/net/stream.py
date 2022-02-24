@@ -14,8 +14,9 @@ from scapy.layers.inet6 import _ICMPv6, ICMPv6Unknown, icmp6typescls
 
 class Stream:
     def __init__(self, config):
-        self.fuzzseed = None
-        self.seeds = []
+        self.payload = None
+        self.const_stream_payloads = []
+
         self.eth = Ether()
         self.ip = IPv6()
         self.packet = {'Ether': self.eth, 'IPv6': self.ip}
@@ -30,40 +31,46 @@ class Stream:
                 for field in self.netconf[layer]:
                     self.packet[layer].fields[field] = self.netconf[layer][field]
 
-    def set_fuzz(self, fuzzseed):
-        self.fuzzseed = fuzzseed
+    def set_payload(self, payload):
+        self.payload = payload
 
-    def get_fuzz_seed(self):
-        return self.fuzzseed
+    def get_payload(self):
+        return self.payload
+
+    def get_const_payloads(self):
+        return self.const_stream_payloads
 
     def push(self, payload):
-        self.seeds.append(payload)
+        self.const_stream_payloads.append(payload)
 
     def pop(self):
-        return self.seeds.pop()
+        return self.const_stream_payloads.pop()
+
+    def size(self):
+        return len(self.const_stream_payloads)
 
     def is_empty(self):
-        return self.fuzzseed == None
+        return self.payload == None
 
-    def loads(self, payload):
+    def loads(self, pcap_payload):
         """
         load stream payload
         """
-        self.seeds.clear()
+        self.const_stream_payloads.clear()
         base_len = len(bytes(self.eth / self.ip))
         pos = 0
 
-        while pos < len(payload):
-            _, _, _, packet_len = struct.unpack("IIII", payload[pos:][:16])
+        while pos < len(pcap_payload):
+            _, _, _, packet_len = struct.unpack("IIII", pcap_payload[pos:][:16])
             pos += 16 + base_len
             seed_len = packet_len - base_len
 
-            seed = payload[pos:][:seed_len]
+            seed = pcap_payload[pos:][:seed_len]
             self.push(seed)
             pos += seed_len
 
-        if len(self.seeds):
-            self.fuzzseed = self.pop()
+        if len(self.const_stream_payloads):
+            self.payload = self.pop()
 
     def _build_icmp_type_cls(self, payload, _cls):
         print(payload)
@@ -83,7 +90,7 @@ class Stream:
 
     def build(self):
         stream_buff = b''
-        cur_seeds = self.seeds + [self.fuzzseed]
+        cur_seeds = self.const_stream_payloads + [self.fuzzseed]
 
         for p in cur_seeds:
             cls_type = p[0]

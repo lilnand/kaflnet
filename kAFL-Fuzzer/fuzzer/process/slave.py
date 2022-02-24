@@ -33,6 +33,7 @@ from fuzzer.state_logic import FuzzingStateLogic
 from fuzzer.statistics import SlaveStatistics
 from fuzzer.technique.helper import rand
 from net.stream import Stream
+from net.logic import ICMPv6Logic
 
 def slave_loader(slave_id):
 
@@ -79,15 +80,18 @@ class SlaveProcess:
         self.statistics = SlaveStatistics(self.slave_id, self.config)
         self.logic = FuzzingStateLogic(self, self.config)
         self.conn = connection
+
+        self.netlogic = ICMPv6Logic(self, config)
         self.current_stream = None
 
         self.bitmap_storage = BitmapStorage(self.config, self.config.config_values['BITMAP_SHM_SIZE'], "master")
 
     def handle_import(self, msg):
         self.current_stream = msg["task"]["stream"]
-        meta_data = {"state": {"name": "import"}, "id": 0}
         payload = msg["task"]["payload"]
-        self.current_stream.set_fuzz(payload)
+        self.current_stream.set_payload(payload)
+
+        meta_data = {"state": {"name": "import"}, "id": 0}
         self.logic.process_node(payload, meta_data)
         self.conn.send_ready()
 
@@ -115,7 +119,7 @@ class SlaveProcess:
         stream.loads(payload)
         self.current_stream = stream
 
-        results, new_payload = self.logic.process_node(stream.get_fuzz_seed(), meta_data)
+        results, new_payload = self.logic.process_node(stream.get_payload(), meta_data)
         if new_payload:
             default_info = {"method": "validate_bits", "parent": meta_data["id"]}
             if self.validate_bits(new_payload, meta_data, default_info):
@@ -211,12 +215,13 @@ class SlaveProcess:
         self.statistics.event_exec_redqueen()
         return self.q.execute_in_redqueen_mode(data)
 
-    def __send_to_master(self, data, execution_res, info):
+    def __send_to_master(self, stream, execution_res, info):
         info["time"] = time.time()
         info["exit_reason"] = execution_res.exit_reason
         info["performance"] = execution_res.performance
         if self.conn is not None:
-            self.conn.send_new_input(data, execution_res.copy_to_array(), info)
+            self.netlogic.process_stream(stream)
+            self.conn.send_new_input(stream, execution_res.copy_to_array(), info)
 
     def trace_payload(self, data, info):
         trace_file_in = self.config.argument_values['work_dir'] + "/redqueen_workdir_%d/pt_trace_results.txt" % self.slave_id;
@@ -263,7 +268,7 @@ class SlaveProcess:
     def execute(self, payload, info):
         self.statistics.event_exec()
         stream = self.current_stream
-        stream.set_fuzz(payload)
+        stream.set_payload(payload)
 
         payload_to_exec = stream.build()
         exec_res = self.__execute(payload_to_exec)
