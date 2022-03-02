@@ -23,13 +23,13 @@ class Stream:
 
         if config:
             self.netconf = config
-            self._init_base_layers()
+            self._init_base_layers(self.netconf)
 
-    def _init_base_layers(self):
+    def _init_base_layers(self, netconf):
         for layer in ['Ether', 'IPv6']:
-            if layer in list(self.netconf.keys()):
-                for field in self.netconf[layer]:
-                    self.packet[layer].fields[field] = self.netconf[layer][field]
+            if layer in list(netconf.keys()):
+                for field in netconf[layer]:
+                    self.packet[layer].fields[field] = netconf[layer][field]
 
     def set_payload(self, payload):
         self.payload = payload

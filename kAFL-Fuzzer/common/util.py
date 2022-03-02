@@ -126,6 +126,30 @@ def copy_seed_files(working_directory, seed_directory):
                     print_warning("Skipping seed file %s (permission denied)." % path)
     return True
 
+def parse_raw_payload_to_serialized_stream(working_directory, seed_directory, serialization_func):
+    if len(os.listdir(seed_directory)) == 0:
+        return False
+
+    if len(os.listdir(working_directory)) == 0:
+        return False
+
+    i = 0
+    for (directory, _, files) in os.walk(seed_directory):
+        for f in files:
+            path = os.path.join(directory, f)
+            if os.path.exists(path):
+                try:
+                    with open(path, 'rb') as f:
+                        raw_seed = f.read()
+                        serialized_seed = serialization_func(raw_seed)
+                        
+                        with open(working_directory + "/imports/" + "seed_%05d" % i) as seed_file:
+                            seed_file.write(serialized_seed)
+                    i += 1
+                except PermissionError:
+                    print_warning("Skipping seed file %s (permission denied)." % path)
+    return True
+
 def print_note(msg):
     sys.stdout.write(color.WARNING + msg + color.ENDC + "\n")
     sys.stdout.flush()

@@ -113,10 +113,8 @@ class SlaveProcess:
 
     def handle_node(self, msg):
         meta_data = QueueNode.get_metadata(msg["task"]["nid"])
-        payload = QueueNode.get_payload(meta_data["info"]["exit_reason"], meta_data["id"])
+        stream = QueueNode.get_payload(meta_data["info"]["exit_reason"], meta_data["id"])
         
-        stream = Stream(self.config.argument_values['netconf'])
-        stream.loads(payload)
         self.current_stream = stream
 
         results, new_payload = self.logic.process_node(stream.get_payload(), meta_data)

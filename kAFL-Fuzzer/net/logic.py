@@ -42,10 +42,8 @@ class ICMPv6Logic:
             _opt_cls_obj = fuzz(_opt_cls())
             
             new_payload = bytes(_cls_obj / _opt_cls_obj)
-        else:
-            new_payload = payload + get_random_string(random.randint(10, 1000)).encode()
 
-        self._write_stream_to_imports(stream, new_payload)
+            self._write_stream_to_imports(stream, new_payload)
 
     def process_stream(self, stream):
         self._handle_type_options(stream)

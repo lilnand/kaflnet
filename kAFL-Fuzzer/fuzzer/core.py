@@ -14,16 +14,18 @@ Prepare the kAFL workdir and copy any provided seeds to be picked up by the sche
 """
 
 import multiprocessing
+import pickle
 import time
 import pgrep
 import sys
 
+from copy import copy
 from common.debug import enable_logging
 from common.self_check import post_self_check
-from common.util import prepare_working_dir, print_fail, print_note, print_warning, copy_seed_files, read_dict_config
+from common.util import prepare_working_dir, print_fail, print_note, print_warning, parse_raw_payload_to_serialized_stream, read_dict_config
 from fuzzer.process.master import MasterProcess
 from fuzzer.process.slave import slave_loader
-
+from net.stream import Stream
 
 def qemu_sweep():
     pids = pgrep.pgrep("qemu")
@@ -67,7 +69,17 @@ def start(config):
         print_fail("Refuse to operate on existing work directory. Use --purge to override.")
         return 1
 
-    if seed_dir and not copy_seed_files(work_dir, seed_dir):
+    def create_serialized_stream(raw_seed):
+        overload_netconf = copy(config.argument_values['netconf'])
+        next_header = raw_seed[0]
+        payload = raw_seed[1:]
+        if 'IPv6' in list(overload_netconf.keys()):
+            overload_netconf['IPv6']['nh'] = next_header
+        stream = Stream(overload_netconf)
+        stream.loads(payload)
+        return pickle.dumps(stream)
+
+    if seed_dir and not parse_raw_payload_to_serialized_stream(work_dir, seed_dir, create_serialized_stream):
         print_fail("Error when importing seeds. Exit.")
         return 1
 

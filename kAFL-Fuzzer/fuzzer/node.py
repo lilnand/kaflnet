@@ -10,6 +10,7 @@ Fuzz inputs are managed as nodes in a queue. Any persistent metadata is stored h
 import lz4.frame
 import mmh3
 import msgpack
+import pickle
 
 from common.config import FuzzerConfiguration
 from common.util import read_binary_file, atomic_write
@@ -36,7 +37,7 @@ class QueueNode:
 
     @staticmethod
     def get_payload(exitreason, id):
-        return read_binary_file(QueueNode.__get_payload_filename(exitreason, id))
+        return pickle.loads(read_binary_file(QueueNode.__get_payload_filename(exitreason, id)))
 
     def __get_bitmap_filename(self):
         workdir = FuzzerConfiguration().argument_values['work_dir']
@@ -94,7 +95,7 @@ class QueueNode:
         self.update_file(write=True)
 
     def set_payload(self, stream, write=True):
-        payload = stream.build()
+        payload = pickle.dumps(stream)
         self.set_payload_len(len(payload), write=False)
         atomic_write(QueueNode.__get_payload_filename(self.get_exit_reason(), self.get_id()), payload)
 

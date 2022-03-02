@@ -12,6 +12,7 @@ Manage overall fuzz inputs/findings and schedule work for Slave instances.
 import glob
 from logging import exception
 import os
+import pickle
 from   pprint import pformat
 import mmh3
 
@@ -56,27 +57,9 @@ class MasterProcess:
         imports = glob.glob(self.config.argument_values['work_dir'] + "/imports/*")
         if imports:
             path = imports.pop()
-            stream = Stream(self.config.argument_values['netconf'])
-            
-            if os.path.isdir(path):
-                
-                payloads = glob.glob(path + "/*")      
-                payloads.sort(reverse=True)
-
-                while payloads:
-                    
-                    current_payload_path = payloads.pop()
-                    
-                    with open(current_payload_path, 'rb') as f:
-                        
-                        current_payload = f.read()
-                        stream.push(current_payload)
-
-                payload = stream.pop()
-                os.rmdir(path)
-            else:
-                payload = read_binary_file(path)
-                os.remove(path)
+            stream = pickle.loads(read_binary_file(path))
+            payload = stream.get_payload()        
+            os.remove(path)
                       
             return self.comm.send_import(conn, {"type": "import", "stream": stream, "payload": payload})
         # Process items from queue..

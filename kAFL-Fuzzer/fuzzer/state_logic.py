@@ -89,7 +89,6 @@ class FuzzingStateLogic:
         self.init_stage_info(metadata)
 
         if not payload:
-            print("Empty payload")
             return self.create_update({"name": "empty"}, None), None
 
         if metadata["state"]["name"] == "import":
